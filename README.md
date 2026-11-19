@@ -29,9 +29,9 @@
 | `GEMINI_API_KEY` | **非公開**・サーバー側でのみ利用 |
 | `NEXT_PUBLIC_SUPABASE_URL` | SupabaseプロジェクトURL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase Publishable Key |
-| `GEMINI_MODEL` (任意) | 未設定なら `gemini-3.8-flash` |
+| `GEMINI_MODEL` (任意) | 未設定なら `gemini-3.5-flash-lite` |
 
-混雑時（HTTP 503/502/504/500 またはモデルの応答タイムアウト）は、原則として3.8 Flashを短く再試行し、`gemini-3.5-flash-lite` → `gemini-3.1-flash-lite` へ切り替える。429（利用上限）は別のエラーとして表示し、固定セリフには戻さない。最後に応答したモデルは設定画面で確認可能。予備モデルが使われた場合は「（予備）」と表示される。
+既定モデルを実績のある `gemini-3.5-flash-lite` に変更。1モデルへの同一リクエスト内での再試行は廃止し、失敗時のみ `gemini-3.1-flash-lite` を1回試す。429が発生したモデルは同一サーバー実行環境で10分間対象外にする（分散インスタンス全体には共有されない）。固定セリフには戻さず、アプリ側では障害中の短い保留メッセージを表示する。
 
 ## Supabase Auth
 
