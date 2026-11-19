@@ -1,5 +1,5 @@
 // One authenticated Gemini call for reply and provisional state inference.
-const Engine=require('./engine');
+const Engine=require('../lib/engine');
 const CASTS = {
   kokoa: {name:'心愛',kana:'ここあ',job:'キャバ嬢',store:'北新地 Club LUNA',tone:'甘めのタメ口。語尾に「〜だよぉ」「♡」をよく使う。相手をたくさん褒める。寂しがり。たまにお店に誘う。'},
   rena: {name:'玲奈',kana:'れな',job:'ラウンジ',store:'北新地 Lounge 月白',tone:'丁寧語ベースのクールな大人の女性。感情は控えめだが、時々本音がこぼれる。'},
