@@ -26,7 +26,8 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:#E4E4E8;font-family:var(--font);-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:inherit}
-input,textarea{font:inherit;color:inherit}
+input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
+::selection{background:var(--accent-soft)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #app{position:relative;width:100%;max-width:430px;height:100dvh;margin:0 auto;background:var(--bg);color:var(--text);overflow:hidden;font-size:15px;line-height:1.45}
 @media(min-width:500px){body{display:flex;align-items:center;justify-content:center}#app{height:min(880px,100dvh);border-radius:24px;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 30px 60px -30px rgba(0,0,0,.35)}}
@@ -38,6 +39,7 @@ input,textarea{font:inherit;color:inherit}
 .ib{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--text)}
 .ib svg{width:24px;height:24px}
 .ib:active{background:var(--fill)}
+.ib.ac{color:var(--accent)}
 .av{width:var(--s);height:var(--s);border-radius:36%;flex-shrink:0;display:grid;place-items:center;background:var(--tb);color:var(--tf);font-weight:600;font-size:calc(var(--s)*.4)}
 [data-mode="night"] .av{filter:saturate(.85) brightness(.9)}
 .av.me{--tb:#E7E7EB;--tf:#6B6B73}
@@ -50,8 +52,8 @@ input,textarea{font:inherit;color:inherit}
 .row .tx{flex:1;min-width:0}
 .row .t1{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .t2{font-size:13px;color:var(--sub);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chip{height:30px;padding:0 14px;border-radius:15px;background:var(--fill);font-size:13px;font-weight:600;flex-shrink:0}
-.chip:active{background:var(--hair)}
+.chip{height:30px;padding:0 14px;border-radius:15px;background:var(--accent-soft);color:var(--accent);font-size:13px;font-weight:600;flex-shrink:0}
+.chip:active{background:var(--accent);color:#fff}
 
 /* 自分 */
 .mine{display:flex;align-items:center;gap:16px;padding:10px 20px 18px;width:100%;border-bottom:1px solid var(--hair)}
@@ -88,7 +90,7 @@ input,textarea{font:inherit;color:inherit}
 .cell .sp{flex:1}
 .seg{display:flex;padding:2px;border-radius:9px;background:var(--fill)}
 .seg button{min-width:64px;height:30px;padding:0 12px;border-radius:7px;font-size:13px;font-weight:600;color:var(--sub)}
-.seg button.on{background:var(--bg);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg button.on{background:var(--bg);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 [data-mode="night"] .seg button.on{background:#3A3A3F}
 .foot{font-size:12px;color:var(--sub);padding:8px 32px 0;line-height:1.6}
 .danger{width:100%;min-height:50px;padding:0 16px;color:#E5484D;font-size:15px;text-align:left}
@@ -97,7 +99,7 @@ input,textarea{font:inherit;color:inherit}
 #nav{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;padding-bottom:env(safe-area-inset-bottom);background:var(--bar);border-top:1px solid var(--hair);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 #nav button{flex:1;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;font-weight:600;color:var(--faint);position:relative}
 #nav button svg{width:25px;height:25px}
-#nav button.on{color:var(--text)}
+#nav button.on{color:var(--accent)}
 .nb{position:absolute;top:5px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:#fff;font-size:11px;display:grid;place-items:center;box-shadow:0 0 0 2px var(--bg)}
 
 /* ---------- レイヤー ---------- */
@@ -133,7 +135,7 @@ input,textarea{font:inherit;color:inherit}
 .meta{font-size:10px;color:var(--sub);line-height:1.3;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;padding-bottom:1px}
 .m.ai .meta{align-items:flex-start}
 .typing .b{display:flex;gap:4px;padding:13px 14px}
-.typing i{width:6px;height:6px;border-radius:50%;background:var(--faint);animation:tp 1.2s infinite}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:tp 1.2s infinite}
 .typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
 @keyframes tp{0%,60%,100%{opacity:.35}30%{opacity:1}}
 .cin{display:flex;align-items:flex-end;gap:8px;padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--hair);flex-shrink:0}
@@ -161,7 +163,7 @@ input,textarea{font:inherit;color:inherit}
 .pf-meta span:last-child{color:var(--text)}
 .acts{display:flex;justify-content:center;gap:48px;padding-top:16px}
 .acts button{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--text);min-width:64px}
-.acts svg{width:26px;height:26px}
+.acts svg{width:26px;height:26px;color:var(--accent)}
 
 /* ---------- 友だち追加 ---------- */
 #add .body{flex:1;overflow-y:auto;padding-bottom:12px}
@@ -179,7 +181,7 @@ input,textarea{font:inherit;color:inherit}
 .card .tg{font-size:12px;color:var(--sub);margin-top:10px}
 .dots{display:flex;gap:6px;justify-content:center;margin:8px 0 0}
 .dots i{width:6px;height:6px;border-radius:50%;background:var(--hair)}
-.dots i.on{background:var(--text)}
+.dots i.on{background:var(--accent)}
 .meet-sec{padding:26px 20px 0}
 .meet-sec h4{font-size:13px;font-weight:500;color:var(--sub);margin-bottom:10px}
 .seg.full{display:flex}
@@ -505,9 +507,9 @@ function renderTab(){
 function homeView(){
   const fr = S.friends.map(f=>({f,c:charById(f.charId)}));
   const reco = CHARS.filter(c=>!friend(c.id));
-  return `<div class="hd"><h1>ホーム</h1><button class="ib" data-act="add" aria-label="友だち追加">${IC.addp}</button></div>
+  return `<div class="hd"><h1>ホーム</h1><button class="ib ac" data-act="add" aria-label="友だち追加">${IC.addp}</button></div>
   <button class="mine" data-tab="set">${meAv(60)}<div class="tx"><div class="t1">${esc(S.me.name)}</div><div class="t2">${esc(S.me.status||'ステータスメッセージを入力')}</div></div></button>
-  <div class="sec"><b>友だち ${fr.length}</b></div>
+  <div class="sec"><b>友だち <span style="color:var(--accent)">${fr.length}</span></b></div>
   ${fr.length ? fr.map(({f,c})=>`<button class="row" data-act="profile" data-id="${f.id}">${av(c,46)}<div class="tx"><div class="t1">${esc(c.name)}</div><div class="t2">${esc(c.status)}</div></div></button>`).join('')
     : `<p class="foot" style="padding:6px 20px 4px">まだ友だちがいません。下から追加できます。</p>`}
   ${reco.length?`<div class="sec"><b>知り合いかも？</b></div>
@@ -517,7 +519,7 @@ function homeView(){
 
 function talkView(){
   const list = S.friends.map(f=>({f,c:charById(f.charId),m:lastMsg(f.id)})).filter(x=>x.m).sort((a,b)=>b.m.ts-a.m.ts);
-  return `<div class="hd"><h1>トーク</h1><button class="ib" data-act="add" aria-label="友だち追加">${IC.addp}</button></div>
+  return `<div class="hd"><h1>トーク</h1><button class="ib ac" data-act="add" aria-label="友だち追加">${IC.addp}</button></div>
   ${list.length ? list.map(({f,c,m})=>`<button class="row trow" data-act="chat" data-id="${f.id}">${av(c,52)}
      <div class="tx"><div class="top"><span class="t1">${esc(c.name)}</span><span class="tm">${listTime(m.ts)}</span></div>
      <div class="bot"><span class="t2 ${typing[f.id]?'typ':''}">${typing[f.id]?'入力中…':esc(m.text.replace(/\n/g,' '))}</span>${f.unread?`<span class="ub">${f.unread}</span>`:''}</div></div></button>`).join('')
@@ -588,7 +590,7 @@ function renderMsgs(force){
   }
   if(typing[fid]){ const first = prev!=='ai'; html+=`<div class="m ai typing ${first?'first':''}"><div class="aw">${first?av(c,36):''}</div><div class="col"><div class="b"><i></i><i></i><i></i></div></div></div>` }
   box.innerHTML = html;
-  $('#c-sub').textContent = typing[fid] ? '入力中…' : `親密度　${LEVELS[levelOf(f.aff)].name}`;
+  $('#c-sub').innerHTML = typing[fid] ? '入力中…' : `親密度　<b style="color:var(--accent);font-weight:600">${LEVELS[levelOf(f.aff)].name}</b>`;
   if(near) box.scrollTop = box.scrollHeight;
 }
 
@@ -616,7 +618,7 @@ function openAdd(charId){
       <div class="cards" id="cards">${CHARS.map(c=>`<div class="card" style="${tv(c)}">
         <div class="cv">${av(c,84)}${friend(c.id)?'<span class="got">追加済み</span>':''}</div>
         <div class="ci"><h3>${esc(c.name)}</h3><div class="job">${esc(c.job)}　${esc(c.store)}</div>
-        <p class="cp">${esc(c.catch)}</p><p class="tg">${c.tags.map(t=>'#'+esc(t)).join('　')}</p></div></div>`).join('')}</div>
+        <p class="cp">${esc(c.catch)}</p><p class="tg" style="color:var(--accent)">${c.tags.map(t=>'#'+esc(t)).join('　')}</p></div></div>`).join('')}</div>
       <div class="dots" id="dots">${CHARS.map(()=>'<i></i>').join('')}</div>
       <div class="meet-sec"><h4>出会い方</h4><div class="seg full" id="meets"></div><p class="meet-d" id="meetd"></p></div>
     </div>
