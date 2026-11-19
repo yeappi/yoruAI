@@ -355,7 +355,7 @@ function load(){try{
   if(!GENDERS[o.me.gender])o.me.gender='male';
   return o;
 }catch(e){return structuredClone(DEFAULT)} }
-const Backend={client:null,ready:false,userId:null,hydrating:false,saveTimer:null,queue:Promise.resolve()};
+const Backend={client:null,ready:false,userId:null,displayId:null,pendingName:null,hydrating:false,saveTimer:null,queue:Promise.resolve()};
 function cleanState(){const copy=structuredClone(S);copy.ai=Object.assign({},copy.ai,{key:'',provider:'gemini'});delete copy.ai.manualMock;return copy}
 function save(){
   S.ai.key='';
@@ -373,29 +373,43 @@ function save(){
 function showAuthGate(message){
   let el=document.getElementById('auth-gate');
   if(!el){el=document.createElement('div');el.id='auth-gate';document.body.appendChild(el)}
-  el.innerHTML='<div class="auth-panel"><h3>yoruAI にログイン</h3><p id="auth-info"></p>'+
-    '<form id="auth-email"><input id="auth-address" type="email" required autocomplete="email" placeholder="メールアドレス"><button type="submit">メールでログイン</button></form>'+
-    '<form id="auth-code" style="display:none"><input id="auth-token" inputmode="numeric" placeholder="メールで届いた認証コード"><button type="submit">コードを確認</button></form>'+
-    '<small>メールのログインリンクを開く方法でもログインできます。</small></div>';
+  el.innerHTML='<div class="auth-panel"><h3>yoruAIをはじめる</h3><p id="auth-info"></p>'+
+    '<form id="auth-start"><input id="auth-name" type="text" required minlength="1" maxlength="12" autocomplete="nickname" placeholder="ユーザー名" aria-label="ユーザー名">'+
+    '<button type="submit" id="auth-go">この名前ではじめる</button></form>'+
+    '<small>メールアドレス・パスワード不要。専用IDを自動発行し、このブラウザにログイン情報を保存します。</small></div>';
   el.classList.add('show');
-  document.getElementById('auth-info').textContent=message||'会話を保存するためログインしてください。';
-  document.getElementById('auth-email').onsubmit=async e=>{
+  const input=document.getElementById('auth-name');
+  const savedName=Backend.pendingName||S.me?.name;
+  if(savedName&&savedName!=='あなた')input.value=savedName;
+  document.getElementById('auth-info').textContent=message||'まずユーザー名を決めてね。同じ名前の人でもIDは別々です。';
+  document.getElementById('auth-start').onsubmit=async e=>{
     e.preventDefault();
-    const email=document.getElementById('auth-address').value.trim();
-    const {error}=await Backend.client.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin,shouldCreateUser:true}});
-    if(error){document.getElementById('auth-info').textContent='送信エラー: '+error.message;return}
-    Backend.loginEmail=email;
-    document.getElementById('auth-info').textContent='メールを送信しました。リンクを開くか、認証コードを入力してください。';
-    document.getElementById('auth-code').style.display='block';
-  };
-  document.getElementById('auth-code').onsubmit=async e=>{
-    e.preventDefault();
-    const token=document.getElementById('auth-token').value.trim();
-    const {data,error}=await Backend.client.auth.verifyOtp({email:Backend.loginEmail,token,type:'email'});
-    if(error){document.getElementById('auth-info').textContent='認証エラー: '+error.message;return}
-    if(data.user)await connectUser(data.user.id);
+    if(!Backend.client)return;
+    const name=input.value.trim().replace(/\s+/g,' ');
+    if(!name){document.getElementById('auth-info').textContent='ユーザー名を入力してください。';return}
+    if(name.length>12){document.getElementById('auth-info').textContent='ユーザー名は12文字以内にしてください。';return}
+    Backend.pendingName=name;
+    const button=document.getElementById('auth-go');
+    button.disabled=true;
+    button.textContent='IDを発行中…';
+    document.getElementById('auth-info').textContent='ログイン用のIDを発行しています。';
+    try{
+      const {data,error}=await Backend.client.auth.signInAnonymously({options:{data:{nickname:name}}});
+      if(error)throw error;
+      if(!data.user?.id)throw new Error('IDを発行できませんでした');
+      await connectUser(data.user.id);
+    }catch(err){
+      const disabled=/anonymous|anon|disable|not enabled/i.test(String(err?.message||''));
+      document.getElementById('auth-info').textContent=disabled
+        ? '匿名ログインがSupabaseで無効です。Authentication → Providers → Anonymous Sign-Ins を有効にして、もう一度押してください。'
+        : 'IDの発行に失敗しました: '+String(err?.message||err);
+    }finally{
+      button.disabled=false;
+      button.textContent='この名前ではじめる';
+    }
   };
 }
+
 async function connectUser(userId){
   if(Backend.hydrating||Backend.ready)return;
   Backend.hydrating=true;
@@ -413,8 +427,14 @@ async function connectUser(userId){
       if(writeError)throw writeError;
     }
     Backend.userId=userId;
+    Backend.displayId='YA-'+userId.replaceAll('-','').slice(0,12).toUpperCase();
+    if(Backend.pendingName){
+      S.me.name=Backend.pendingName;
+      Backend.pendingName=null;
+    }
     Backend.ready=true;
     localStorage.setItem(KEY,JSON.stringify(cleanState()));
+    save();
     document.getElementById('auth-gate')?.classList.remove('show');
     applyMode();refresh();toast('クラウド接続完了');
   }catch(e){
@@ -437,9 +457,7 @@ async function initBackend(){
     const {data:{session},error}=await Backend.client.auth.getSession();
     if(error)throw error;
     if(session?.user?.id){await connectUser(session.user.id);return}
-    const anon=await Backend.client.auth.signInAnonymously();
-    if(anon.error){showAuthGate('匿名ログインが利用できないため、メールでログインしてください。');return}
-    if(anon.data.user)await connectUser(anon.data.user.id);
+    showAuthGate('ユーザー名を入力すると、専用IDが自動で発行されます。');
   }catch(e){
     console.error('Backend startup failed',e);
     if(Backend.client)showAuthGate('接続に失敗しました: '+(e.message||e));
@@ -635,10 +653,11 @@ function setView(){
   <div class="sec"><b>プロフィール</b></div>
   <div class="grp">
     <div class="cell"><label for="s-name">名前</label><input id="s-name" value="${esc(S.me.name)}" maxlength="12"></div>
+    <div class="cell"><label>固定ID</label><span style="font-size:12px;letter-spacing:.02em">${esc(Backend.displayId||'未発行')}</span></div>
     <div class="cell"><label>性別</label><span class="sp"></span><div class="seg">${g.map(([k,l])=>`<button class="${S.me.gender===k?'on':''}" data-act="gender" data-id="${k}">${l}</button>`).join('')}</div></div>
     <div class="cell"><label for="s-status">ステータス</label><input id="s-status" value="${esc(S.me.status)}" maxlength="30" placeholder="未設定"></div>
   </div>
-  <p class="foot">名前と性別は、相手の話し方に反映されます。</p>
+  <p class="foot">名前は後から変更できますが、IDは変わりません。テスト版では、このブラウザのログイン情報を削除すると同じIDに戻れなくなります。</p>
   <div class="sec"><b>表示</b></div>
   <div class="grp"><div class="cell"><label>テーマ</label><span class="sp"></span><div class="seg">
     <button class="${S.mode==='light'?'on':''}" data-act="mode" data-id="light">ライト</button>
@@ -649,7 +668,7 @@ function setView(){
   <p class="foot">固定返信は停止しています。返答はGeminiが生成します。APIキーはサーバー側で管理します。</p>
   <div class="sec"><b>データ</b></div>
   <div class="grp"><button class="danger" data-act="reset">友だちとトークをすべて削除</button></div>
-  <p class="foot" style="padding-bottom:28px">yoruAI 0.4</p></div>`;
+  <p class="foot" style="padding-bottom:28px">yoruAI 0.5</p></div>`;
 }
 
 /* --- トークルーム --- */
