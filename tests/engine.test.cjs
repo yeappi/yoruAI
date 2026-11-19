@@ -127,28 +127,10 @@ test('user requests: detected, remembered across casts, enforced, and put at top
 });
 
 
-test('Yapi style cadence limits symbols per emitted bubbles and preserves real words',()=>{
- let cadence=E.initialState('yapi').styleCadence;
- const bubbles=[];
- for(let i=0;i<60;i++){
-  const processed=E.enforceYapiStyle(['え笑笑、そうだね。'],cadence);
-  assert.equal(processed.messages.length,1);
-  bubbles.push(processed.messages[0]);
-  cadence=processed.styleCadence;
- }
- const punct=bubbles.flatMap((m,i)=>/[、。]/.test(m)?[i+1]:[]);
- const laughs=bubbles.flatMap((m,i)=>/笑/.test(m)?[i+1]:[]);
- assert.ok(punct.length<=4,'at most one punctuation bubble per 15');
- assert.ok(laughs.length<=6,'at most one laughter bubble per 10');
- for(let i=1;i<punct.length;i++)assert.ok(punct[i]-punct[i-1]>=15);
- for(let i=1;i<laughs.length;i++)assert.ok(laughs[i]-laughs[i-1]>=10);
- for(const m of bubbles)assert.ok((m.match(/[、。]/g)||[]).length<=1,'only one punctuation mark per bubble');
- assert.equal(cadence.bubbles,60);
- assert.deepEqual(E.enforceYapiStyle(['笑顔がいい','昨日笑った'],cadence).messages,['笑顔がいい','昨日笑った']);
- const onlyLaughs=E.enforceYapiStyle(['笑笑','笑'],E.initialState('yapi').styleCadence);
- assert.deepEqual(onlyLaughs.messages,['うん'],'never return empty messages');
- assert.equal(onlyLaughs.styleCadence.bubbles,1);
- assert.deepEqual(E.enforce(['そうだね、笑'],[]),['そうだね、笑'],'other casts remain unchanged');
+test('no code-side cadence control: laughter and punctuation pass through unless the user asked',()=>{
+ assert.deepEqual(E.enforce(['え笑笑、そうだね。'],[]),['え笑笑、そうだね。']);
+ assert.equal(E.initialState('yapi').styleCadence,undefined);
+ assert.equal(E.enforceYapiStyle,undefined);
 });
 
 test('Yapi can initiate closeness at low relationship without changing global rules',()=>{
