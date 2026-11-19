@@ -220,7 +220,7 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
   <div id="toast" role="status"></div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.js"></script>
 <script>
 /* =========================================================
    yoruAI — プロトタイプ（1ファイル）
@@ -525,6 +525,7 @@ function sendMsg(fid, text){
 
 async function respond(fid){
   if(busy[fid]) return; busy[fid]=true;
+  let failed=false;
   try{
     await wait(500+Math.random()*1200);
     (S.msgs[fid]||[]).forEach(m=>{ if(m.from==='me') m.read=true }); save(); refresh();
@@ -538,13 +539,14 @@ async function respond(fid){
       pushMsg(fid, {from:'ai', text:parts[i], ts:Date.now()});
     }
   } catch(e){
+    failed=true;
     console.error('AI response error',e);
     toast('AI返信エラー');
     pushMsg(fid,{from:'sys',text:'⚠️ AI返信エラー: '+String(e.message||e).slice(0,140),ts:Date.now()});
   } finally { typing[fid]=false; busy[fid]=false; refresh() }
   const ms = S.msgs[fid]||[];
   const lastAi = ms.map(m=>m.from).lastIndexOf('ai');
-  if(ms.slice(lastAi+1).some(m=>m.from==='me')) respond(fid); // 返信中に送られた分にも返す
+  if(!failed && ms.slice(lastAi+1).some(m=>m.from==='me')) respond(fid); // 返信中に送られた分にも返す
 }
 
 function addFriend(charId, meet){
@@ -669,7 +671,7 @@ function openChat(fid){
   const inp = $('#inp');
   inp.oninput = ()=>{ inp.style.height='auto'; inp.style.height=inp.scrollHeight+'px'; $('#sendb').classList.toggle('on', !!inp.value.trim()) };
   inp.onkeydown = e=>{ if(e.key==='Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); $('#cin').requestSubmit() } };
-  $('#cin').onsubmit = e=>{ e.preventDefault(); const v=inp.value.trim(); if(!v) return; inp.value=''; inp.oninput(); sendMsg(fid, v); inp.focus() };
+  $('#cin').onsubmit = e=>{ e.preventDefault(); const v=inp.value.trim(); if(!v) return; if(!Backend.ready){toast('接続を準備中です');return} inp.value=''; inp.oninput(); sendMsg(fid, v); inp.focus() };
 }
 function closeChat(){ openChatId=null; $('#chat').classList.remove('open'); refresh() }
 
