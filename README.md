@@ -63,3 +63,11 @@ Supabaseの匿名サインインが無効な場合は設定手順を表示し、
 4. 別ユーザーのデータをRLSで読めないこと
 
 UIのデザインは、Geminiの接続やDB実装とは独立して改善できる。
+
+## 開発者画面（/admin）
+- AIの追加・編集・削除・アイコン、試し話、全ユーザーの会話履歴の閲覧、AIから指定時刻に送る連絡を扱う。
+- 合言葉は Vercel の環境変数 `ADMIN_PASSWORD`。サーバー（`api/admin.js`）で検証し、ブラウザには sessionStorage にだけ置く（タブを閉じると消える）。失敗が続くと10分ブロック。
+- 他に必要な環境変数: `SUPABASE_SERVICE_ROLE_KEY`（全ユーザーの読み取りとキャスト書き込み用。ブラウザには出さない）。
+- `supabase/admin.sql` を Supabase の SQL Editor で1回実行する（`casts` と `admin_pushes`）。
+- キャストの定義は 組み込み（`casts.js` + `lib/engine.js` の PERSONAS）に DB の `casts` を重ねる。組み込みを編集すると上書き、削除は非表示（「元に戻す」で復活）。
+- 連絡は `admin_pushes` に予約され、ユーザーがアプリを開いている間は60秒ごと／開いた時に受信して、時刻を過ぎていれば届く。

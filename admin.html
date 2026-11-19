@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>yoruAI 開発者</title>
+<style>
+:root{--accent:#EE3A5D;--accent-press:#D62E50;--accent-soft:#FDECEF;--bg:#fff;--group:#F3F3F5;--text:#18181B;--sub:#8B8B93;--faint:#B9B9C0;--hair:rgba(24,24,27,.09);--fill:#F1F1F3;--ok:#1E9E5A;
+ --font:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--group);color:var(--text);font:15px/1.55 var(--font)}
+button,input,select,textarea{font:inherit;color:inherit}
+.hidden{display:none!important}
+header{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--hair);padding:10px 16px;display:flex;align-items:center;gap:12px}
+header b{font-size:16px}
+header .sp{flex:1}
+header button.out{background:none;border:0;color:var(--sub);font-size:13px;cursor:pointer}
+nav{display:flex;gap:4px;background:#fff;border-bottom:1px solid var(--hair);padding:0 12px;position:sticky;top:45px;z-index:4}
+nav button{border:0;background:none;padding:12px 14px;font-weight:600;color:var(--sub);border-bottom:2px solid transparent;cursor:pointer}
+nav button.on{color:var(--accent);border-color:var(--accent)}
+main{max-width:760px;margin:0 auto;padding:16px 16px 80px}
+.login{max-width:340px;margin:18vh auto 0;padding:0 24px;text-align:center}
+.login .logo{width:56px;height:56px;border-radius:16px;background:var(--accent);color:#fff;font-size:26px;font-weight:800;display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+.login h1{font-size:20px;margin:0 0 6px}
+.login p{color:var(--sub);font-size:13px;margin:0 0 20px}
+input[type=text],input[type=password],input[type=datetime-local],select,textarea{width:100%;padding:11px 13px;border:0;border-radius:10px;background:var(--fill);outline:none;margin:0}
+textarea{resize:vertical;min-height:64px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{box-shadow:0 0 0 2px var(--accent)}
+.btn{white-space:nowrap;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;padding:11px 16px;cursor:pointer}
+.btn:active{background:var(--accent-press)}
+.btn:disabled{opacity:.5}
+.btn.sub{background:var(--fill);color:var(--text)}
+.btn.danger{background:none;color:#D62E50;padding:11px 4px}
+.btn.wide{width:100%}
+.grp{background:#fff;border-radius:14px;overflow:hidden;margin:0 0 16px}
+.row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--hair);cursor:pointer;width:100%;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0}
+.row:first-child{border-top:0}
+.row .t{flex:1;min-width:0}
+.row .t b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .t span{display:block;color:var(--sub);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .go{color:var(--faint)}
+.tag{font-size:11px;color:var(--sub);background:var(--fill);border-radius:6px;padding:1px 7px;margin-left:6px;font-weight:500}
+.tag.hot{color:var(--accent);background:var(--accent-soft)}
+.av{width:44px;height:44px;border-radius:36%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;flex-shrink:0;overflow:hidden}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.av.lg{width:72px;height:72px;font-size:28px}
+h2{font-size:13px;color:var(--sub);font-weight:600;margin:22px 4px 8px}
+.top{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.top h1{font-size:18px;margin:0;flex:1}
+.back{border:0;background:none;color:var(--accent);font-weight:600;cursor:pointer;padding:6px 0}
+.form{background:#fff;border-radius:14px;padding:16px;margin:0 0 16px}
+.form label{display:block;font-size:12.5px;color:var(--sub);font-weight:600;margin:14px 0 5px}
+.form label:first-child{margin-top:0}
+.form .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form small{display:block;color:var(--sub);font-size:12px;margin-top:4px}
+.icon-row{display:flex;align-items:center;gap:14px}
+.msgs{background:#fff;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;max-height:56vh;overflow-y:auto}
+.b{max-width:80%;padding:8px 12px;border-radius:16px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14.5px}
+.b.ai{background:var(--fill);align-self:flex-start}
+.b.me{background:var(--accent);color:#fff;align-self:flex-end}
+.b small{display:block;opacity:.6;font-size:10.5px;margin-top:2px}
+.state{background:#fff;border-radius:14px;padding:14px;font-size:13px;color:var(--sub);margin:0 0 16px}
+.state b{color:var(--text)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.chips button{border:0;background:#fff;border-radius:999px;padding:7px 14px;font-weight:600;cursor:pointer;color:var(--sub)}
+.chips button.on{background:var(--accent);color:#fff}
+.send{display:flex;gap:8px;margin-top:10px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#18181B;color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;z-index:20;max-width:90vw}
+.note{color:var(--sub);font-size:12.5px;margin:6px 4px 0}
+.setup{background:#fff;border-radius:14px;padding:14px 16px;margin:0 0 16px;font-size:13.5px}
+.setup li{margin:4px 0}
+.setup code{background:var(--fill);padding:1px 6px;border-radius:5px;font-size:12.5px}
+.ok{color:var(--ok)}.ng{color:var(--accent)}
+</style>
+</head>
+<body>
+<div id="login" class="login hidden">
+  <div class="logo" aria-hidden="true">夜</div>
+  <h1>開発者</h1>
+  <p>合言葉を入力してください。<br>このタブを閉じると忘れます。</p>
+  <form id="login-form">
+    <input id="pw" type="password" autocomplete="current-password" placeholder="合言葉" aria-label="合言葉" style="margin-bottom:12px">
+    <button class="btn wide" id="login-go" type="submit">入る</button>
+  </form>
+  <p id="login-err" class="ng" style="margin-top:14px"></p>
+</div>
+
+<div id="app" class="hidden">
+  <header><b>yoruAI 開発者</b><span class="sp"></span><button class="out" id="logout">ログアウト</button></header>
+  <nav id="tabs"></nav>
+  <main id="view"></main>
+</div>
+<div id="toast" class="toast hidden"></div>
+
+<script src="/relation.js"></script>
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let PW=sessionStorage.getItem('yoru-admin')||'';
+let tab='casts';
+const st={casts:null,users:null,setup:null,edit:null,convo:null,pushes:null,tryChat:null};
+
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.remove('hidden');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.add('hidden'),2600)}
+async function api(action,data={}){
+  const res=await fetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json','x-admin-password':PW},body:JSON.stringify({action,...data})});
+  const j=await res.json().catch(()=>({error:'サーバーの応答が読めません'}));
+  if(res.status===401){logout(false);throw new Error(j.error||'合言葉が違います')}
+  if(!res.ok)throw new Error(j.error||('エラー '+res.status));
+  return j;
+}
+const fmt=t=>{if(!t)return'';const d=new Date(t);return (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
+const avatar=(c,cls='')=>`<span class="av ${cls}">${c?.icon?`<img alt="" src="${esc(c.icon)}">`:esc((c?.name||'?')[0])}</span>`;
+
+// ---------- ログイン
+function showLogin(msg){$('#app').classList.add('hidden');$('#login').classList.remove('hidden');$('#login-err').textContent=msg||'';$('#pw').focus()}
+function logout(clear=true){if(clear){PW='';sessionStorage.removeItem('yoru-admin')}showLogin(clear?'':'合言葉が違います')}
+$('#logout').onclick=()=>logout(true);
+$('#login-form').onsubmit=async e=>{
+  e.preventDefault();PW=$('#pw').value;const b=$('#login-go');b.disabled=true;$('#login-err').textContent='';
+  try{await enter()}catch(err){$('#login-err').textContent=err.message}finally{b.disabled=false}
+};
+async function enter(){
+  st.setup=await api('status');
+  sessionStorage.setItem('yoru-admin',PW);
+  $('#login').classList.add('hidden');$('#app').classList.remove('hidden');
+  render();
+}
+
+// ---------- 画面
+const TABS=[['casts','AI'],['users','ユーザー'],['pushes','連絡']];
+function render(){
+  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button data-t="${k}" class="${tab===k?'on':''}">${l}</button>`).join('');
+  $('#tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;st.edit=null;st.convo=null;render()});
+  ({casts:viewCasts,users:viewUsers,pushes:viewPushes})[tab]();
+}
+function setupNote(){
+  const s=st.setup;if(!s)return'';
+  const bad=[];
+  if(!s.serviceKey)bad.push('Vercelの環境変数に <code>SUPABASE_SERVICE_ROLE_KEY</code> を追加（Supabase → Project Settings → API の service_role キー）');
+  else{
+    if(!s.castsTable||!s.pushesTable)bad.push('Supabaseの SQL Editor で <code>supabase/admin.sql</code> を実行（AIの保存と連絡の予約に必要）');
+  }
+  if(!s.gemini)bad.push('<code>GEMINI_API_KEY</code> が未設定です');
+  return bad.length?`<div class="setup"><b>あと少しで使えます</b><ol style="margin:8px 0 0;padding-left:20px">${bad.map(x=>`<li>${x}</li>`).join('')}</ol><p class="note">設定したら再デプロイして、ページを開き直してください。</p></div>`:'';
+}
+
+// ----- AI一覧・編集
+async function viewCasts(){
+  const v=$('#view');
+  if(st.edit){return viewEdit()}
+  v.innerHTML=setupNote()+'<p class="note">読み込み中…</p>';
+  try{st.casts=await api('casts.list')}catch(e){v.innerHTML=setupNote()+`<p class="ng">${esc(e.message)}</p>`;return}
+  const c=st.casts;
+  v.innerHTML=setupNote()+`<div class="top"><h1>AI（${c.casts.length}）</h1><button class="btn" id="add">追加</button></div>
+  ${c.tableMissing?'<p class="note ng">テーブル未作成のため、組み込みのAIだけ表示しています。</p>':''}
+  <div class="grp">${c.casts.map(x=>`<button class="row" data-id="${esc(x.id)}">${avatar(x)}<span class="t"><b>${esc(x.name)}<span class="tag">${esc(x.job)}</span>${x.builtin?'':'<span class="tag hot">追加</span>'}${x.edited?'<span class="tag hot">編集済み</span>':''}</b><span>${esc(x.catch)}</span></span><span class="go">›</span></button>`).join('')}</div>
+  ${c.removed.length?`<h2>削除したAI</h2><div class="grp">${c.removed.map(id=>`<div class="row" style="cursor:default"><span class="t"><b>${esc(id)}</b></span><button class="btn sub" data-restore="${esc(id)}">元に戻す</button></div>`).join('')}</div>`:''}`;
+  $('#add').onclick=()=>{st.edit={isNew:true,cast:{id:'',name:'',kana:'',job:'',store:'',catch:'',status:'',tags:[],tone:'',values:'',want:'',style:'',life:[],examples:[],icon:''}};st.tryChat=null;render()};
+  v.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{const x=st.casts.casts.find(y=>y.id===b.dataset.id);st.edit={isNew:false,cast:structuredClone(x),builtin:x.builtin,edited:x.edited};st.tryChat=null;render()});
+  v.querySelectorAll('[data-restore]').forEach(b=>b.onclick=async()=>{try{await api('casts.reset',{id:b.dataset.restore});toast('元に戻しました');viewCasts()}catch(e){toast(e.message)}});
+}
+const lines=t=>String(t||'').split('\n').map(x=>x.trim()).filter(Boolean);
+function viewEdit(){
+  const {cast:c,isNew,builtin,edited}=st.edit,v=$('#view');
+  v.innerHTML=setupNote()+`<div class="top"><button class="back" id="back">‹ 戻る</button><h1>${isNew?'AIを追加':esc(c.name)+'を編集'}</h1></div>
+  <div class="form">
+    <label>アイコン</label>
+    <div class="icon-row"><div id="ic">${avatar(c,'lg')}</div><div><input id="f-icon" type="file" accept="image/*"><small>正方形に切り抜いて小さくして保存します。</small><button class="btn danger" id="ic-clear" type="button">画像をはずす</button></div></div>
+    <label>ID（英小文字・数字・-・_）</label><input type="text" id="f-id" value="${esc(c.id)}" ${isNew?'':'disabled'} placeholder="hana"><small>${isNew?'あとから変えられません。':''}</small>
+    <div class="two"><div><label>名前</label><input type="text" id="f-name" value="${esc(c.name)}" maxlength="20"></div><div><label>よみ</label><input type="text" id="f-kana" value="${esc(c.kana)}" maxlength="30"></div></div>
+    <div class="two"><div><label>職業</label><input type="text" id="f-job" value="${esc(c.job)}" maxlength="20" placeholder="キャバ嬢"></div><div><label>お店</label><input type="text" id="f-store" value="${esc(c.store)}" maxlength="40"></div></div>
+    <label>キャッチコピー</label><input type="text" id="f-catch" value="${esc(c.catch)}" maxlength="80">
+    <label>ひとこと（プロフィールの状態メッセージ）</label><input type="text" id="f-status" value="${esc(c.status)}" maxlength="60">
+    <label>タグ（1行に1つ、5つまで）</label><textarea id="f-tags" rows="3">${esc((c.tags||[]).join('\n'))}</textarea>
+    <h2 style="margin-left:0">人格</h2>
+    <label>話し方</label><textarea id="f-tone" maxlength="300">${esc(c.tone)}</textarea>
+    <label>価値観</label><textarea id="f-values" maxlength="300">${esc(c.values)}</textarea>
+    <label>いま求めていること</label><textarea id="f-want" maxlength="300">${esc(c.want)}</textarea>
+    <label>返し方のクセ</label><textarea id="f-style" maxlength="300">${esc(c.style)}</textarea>
+    <label>日々の出来事（1行に1つ。その日の気分の理由になる）</label><textarea id="f-life" rows="4">${esc((c.life||[]).join('\n'))}</textarea>
+    <label>口調の例（1行に1つ。例:客「疲れた」→「おつかれ！」）</label><textarea id="f-examples" rows="4">${esc((c.examples||[]).join('\n'))}</textarea>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="save">保存</button>
+    ${isNew?'':(builtin?(edited?'<button class="btn sub" id="reset">初期設定に戻す</button>':''):'')}
+    ${isNew?'':'<button class="btn danger" id="del">削除</button>'}</div>
+  <p class="note">保存するとすぐ全ユーザーに反映されます（数十秒以内）。</p>
+  <h2>試し話（保存しません）</h2><div id="try"></div>`;
+  $('#back').onclick=()=>{st.edit=null;render()};
+  const read=()=>{
+    const g=id=>$('#'+id).value;
+    Object.assign(c,{id:isNew?g('f-id').trim():c.id,name:g('f-name'),kana:g('f-kana'),job:g('f-job'),store:g('f-store'),catch:g('f-catch'),status:g('f-status'),
+      tags:lines(g('f-tags')).slice(0,5),tone:g('f-tone'),values:g('f-values'),want:g('f-want'),style:g('f-style'),life:lines(g('f-life')),examples:lines(g('f-examples'))});
+  };
+  $('#f-icon').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{read();c.icon=await toIcon(f);$('#ic').innerHTML=avatar(c,'lg')}catch(err){toast(err.message)}};
+  $('#ic-clear').onclick=()=>{read();c.icon='';$('#ic').innerHTML=avatar(c,'lg')};
+  $('#save').onclick=async()=>{read();const b=$('#save');b.disabled=true;try{await api('casts.save',{cast:c});toast('保存しました');st.edit=null;render()}catch(e){toast(e.message)}finally{b.disabled=false}};
+  if($('#del'))$('#del').onclick=async()=>{if(!confirm(c.name+'を削除しますか？\n友達にしているユーザーのトークは残りますが、新しい返信はできなくなります。'))return;try{await api('casts.delete',{id:c.id});toast('削除しました');st.edit=null;render()}catch(e){toast(e.message)}};
+  if($('#reset'))$('#reset').onclick=async()=>{if(!confirm('初期設定に戻しますか？'))return;try{await api('casts.reset',{id:c.id});toast('戻しました');st.edit=null;render()}catch(e){toast(e.message)}};
+  mountTry(read);
+}
+function toIcon(file){
+  return new Promise((ok,ng)=>{
+    const img=new Image(),url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const n=192,cv=document.createElement('canvas');cv.width=cv.height=n;
+      const s=Math.min(img.width,img.height),sx=(img.width-s)/2,sy=(img.height-s)/2;
+      const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,n,n);x.drawImage(img,sx,sy,s,s,0,0,n,n);
+      URL.revokeObjectURL(url);ok(cv.toDataURL('image/jpeg',.85));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);ng(new Error('画像を読み込めません'))};
+    img.src=url;
+  });
+}
+
+// ----- 試し話
+function mountTry(read){
+  const t=st.tryChat||(st.tryChat={history:[],state:null,meet:'first',gender:'male',name:'テスト'});
+  const box=$('#try');
+  const draw=()=>{
+    box.innerHTML=`<div class="form" style="padding:12px 16px 16px">
+      <div class="two" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        <select id="t-meet"><option value="first">初回</option><option value="nanpa">ナンパ</option><option value="match">マッチングアプリ</option></select>
+        <select id="t-gender"><option value="male">男性</option><option value="female">女性</option></select>
+        <input type="text" id="t-name" value="${esc(t.name)}" maxlength="20" aria-label="呼ばれる名前">
+      </div>
+      <div class="msgs" id="t-msgs">${t.history.length?t.history.map(m=>`<div class="b ${m.from}">${esc(m.text)}</div>`).join(''):'<span class="note">「最初のあいさつ」で、出会った直後の一言を見られます。</span>'}</div>
+      ${t.state?`<p class="note">関係: ${esc(Relation.note(t.state.relationship)||'—')}　／　気分 ${t.state.mood?.valence>0?'+':''}${t.state.mood?.valence} (${esc(t.state.mood?.reason||'')})</p>`:''}
+      <div class="send"><input type="text" id="t-in" placeholder="メッセージ" aria-label="メッセージ"><button class="btn" id="t-go">送信</button></div>
+      <div style="display:flex;gap:10px;margin-top:10px"><button class="btn sub" id="t-first" type="button">最初のあいさつ</button><button class="btn sub" id="t-reset" type="button">リセット</button></div></div>`;
+    $('#t-meet').value=t.meet;$('#t-gender').value=t.gender;
+    const m=$('#t-msgs');m.scrollTop=m.scrollHeight;
+    $('#t-reset').onclick=()=>{t.history=[];t.state=null;draw()};
+    $('#t-first').onclick=()=>run(null);
+    $('#t-go').onclick=()=>{const v=$('#t-in').value.trim();if(v)run(v)};
+    $('#t-in').onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();const v=$('#t-in').value.trim();if(v)run(v)}};
+  };
+  const run=async text=>{
+    t.meet=$('#t-meet').value;t.gender=$('#t-gender').value;t.name=$('#t-name').value||'テスト';
+    read();
+    if(text){t.history.push({from:'me',text})}else{t.history=[];t.state=null}
+    draw();$('#t-go').disabled=true;
+    try{
+      const r=await api('try',{cast:st.edit.cast,meetKey:t.meet,userName:t.name,userGender:t.gender,history:t.history,engineState:t.state});
+      for(const x of r.messages)t.history.push({from:'ai',text:x});
+      t.state=r.engineState;
+    }catch(e){toast(e.message)}
+    draw();
+  };
+  draw();
+}
+
+// ----- ユーザーと会話履歴
+async function viewUsers(){
+  const v=$('#view');
+  if(st.convo)return viewConvo();
+  v.innerHTML=setupNote()+'<p class="note">読み込み中…</p>';
+  try{st.users=(await api('users.list')).users}catch(e){v.innerHTML=setupNote()+`<p class="ng">${esc(e.message)}</p>`;return}
+  v.innerHTML=setupNote()+`<div class="top"><h1>ユーザー（${st.users.length}）</h1><button class="btn sub" id="reload">更新</button></div>
+  <div class="grp">${st.users.map(u=>{const n=u.friends.reduce((a,f)=>a+f.count,0);return `<button class="row" data-u="${esc(u.userId)}"><span class="av">${esc((u.name||'?')[0])}</span><span class="t"><b>${esc(u.name||'（名前なし）')}<span class="tag">${u.friends.length}人</span></b><span>メッセージ ${n}件・最終 ${fmt(u.updatedAt)}</span></span><span class="go">›</span></button>`}).join('')||'<div class="row" style="cursor:default"><span class="t"><span>まだユーザーがいません</span></span></div>'}</div>`;
+  $('#reload').onclick=viewUsers;
+  v.querySelectorAll('[data-u]').forEach(b=>b.onclick=async()=>{try{st.convo=await api('convo',{userId:b.dataset.u});st.convo.sel=st.convo.user.friends[0]?.id||null;render()}catch(e){toast(e.message)}});
+}
+function viewConvo(){
+  const c=st.convo,v=$('#view'),u=c.user,f=u.friends.find(x=>x.id===c.sel);
+  const cast=f?c.casts[f.charId]:null;
+  const msgs=f?(c.msgs[f.id]||[]):[];
+  const a=f?c.actors[f.id]:null;
+  v.innerHTML=`<div class="top"><button class="back" id="back">‹ 戻る</button><h1>${esc(u.name||'（名前なし）')}</h1><button class="btn sub" id="reload">更新</button></div>
+  <div class="chips">${u.friends.map(x=>`<button data-f="${esc(x.id)}" class="${x.id===c.sel?'on':''}">${esc(c.casts[x.charId]?.name||x.charId)}</button>`).join('')||'<span class="note">友達がいません</span>'}</div>
+  ${f?`<div class="msgs" id="msgs">${msgs.map(m=>`<div class="b ${m.from==='ai'?'ai':'me'}">${esc(m.text)}<small>${fmt(m.ts)}</small></div>`).join('')||'<span class="note">まだ会話がありません</span>'}</div>
+  <h2>状態</h2><div class="state"><b>関係:</b> ${esc(Relation.note(a?.relationship)||'まだ記録なし')}${a?.relationship?`<br>${Object.entries(a.relationship).map(([k,x])=>k+' '+Math.round(x)).join(' / ')}`:''}
+    ${a?.mood?`<br><b>気分:</b> ${a.mood.valence>0?'+':''}${a.mood.valence}・元気 ${Math.round(a.mood.energy)}（${esc(a.mood.reason||'')}）`:''}
+    ${a?.memories?.length?`<br><b>記憶:</b> ${a.memories.slice(-6).map(m=>esc(m.text)).join(' / ')}`:''}
+    ${a?.intent?`<br><b>途中の話題:</b> ${esc(a.intent)}`:''}</div>
+  <button class="btn" id="to-push">${esc(cast?.name||'')}から連絡する</button>`:''}`;
+  $('#back').onclick=()=>{st.convo=null;render()};
+  $('#reload').onclick=async()=>{try{const sel=c.sel;st.convo=await api('convo',{userId:u.userId});st.convo.sel=sel;render()}catch(e){toast(e.message)}};
+  v.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{c.sel=b.dataset.f;render()});
+  const m=$('#msgs');if(m)m.scrollTop=m.scrollHeight;
+  if($('#to-push'))$('#to-push').onclick=()=>{st.pushPre={userId:u.userId,charId:f.charId};st.convoKeep=false;st.convo=null;tab='pushes';render()};
+}
+
+// ----- AIからの連絡
+async function viewPushes(){
+  const v=$('#view');
+  v.innerHTML=setupNote()+'<p class="note">読み込み中…</p>';
+  let users,pushes,casts;
+  try{[users,pushes,casts]=await Promise.all([api('users.list'),api('push.list'),api('casts.list')])}catch(e){v.innerHTML=setupNote()+`<p class="ng">${esc(e.message)}</p>`;return}
+  const pre=st.pushPre||{};st.pushPre=null;
+  const nameOf=id=>users.users.find(u=>u.userId===id)?.name||id.slice(0,6);
+  const castName=id=>casts.casts.find(c=>c.id===id)?.name||id;
+  const now=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
+  v.innerHTML=setupNote()+`<h2 style="margin-top:0">連絡を予約</h2><div class="form">
+    <label>送る相手</label><select id="p-user">${users.users.map(u=>`<option value="${esc(u.userId)}">${esc(u.name||'（名前なし）')}</option>`).join('')}</select>
+    <label>どのAIから</label><select id="p-char"></select>
+    <label>AIに書かせる（任意）</label><div class="send" style="margin-top:0"><input type="text" id="p-inst" placeholder="例: 今日は雨だねと話しかける" maxlength="200"><button class="btn sub" id="p-draft" type="button">下書き</button></div>
+    <small>そのユーザーとの実際の会話を読んで、AIの口調で書きます。</small>
+    <label>本文（1行が1つの吹き出し・6つまで）</label><textarea id="p-text" rows="4" maxlength="1500"></textarea>
+    <label>届ける時刻</label><input type="datetime-local" id="p-at" value="${now}">
+    <small>相手がアプリを開いたとき、時刻を過ぎていれば届きます。</small>
+    <div style="margin-top:14px"><button class="btn wide" id="p-go">予約する</button></div></div>
+  <h2>予約・送信済み</h2><div class="grp">${pushes.pushes.map(p=>`<div class="row" style="cursor:default"><span class="t"><b>${esc(castName(p.char_id))} → ${esc(nameOf(p.user_id))}</b><span>${esc(p.text.replace(/\n/g,' / '))}</span><span>${p.delivered_at?'<span class="ok">届きました '+fmt(p.delivered_at)+'</span>':'予定 '+fmt(p.deliver_at)}</span></span>${p.delivered_at?'':`<button class="btn danger" data-c="${esc(p.id)}">取消</button>`}</div>`).join('')||'<div class="row" style="cursor:default"><span class="t"><span>まだありません</span></span></div>'}</div>`;
+  const fillChars=()=>{
+    const u=users.users.find(x=>x.userId===$('#p-user').value);
+    $('#p-char').innerHTML=(u?.friends||[]).map(f=>`<option value="${esc(f.charId)}">${esc(castName(f.charId))}</option>`).join('')||'<option value="">友達がいません</option>';
+  };
+  if(pre.userId)$('#p-user').value=pre.userId;
+  fillChars();if(pre.charId)$('#p-char').value=pre.charId;
+  $('#p-user').onchange=fillChars;
+  $('#p-draft').onclick=async()=>{
+    const b=$('#p-draft');b.disabled=true;
+    try{const r=await api('push.draft',{userId:$('#p-user').value,charId:$('#p-char').value,instruction:$('#p-inst').value});$('#p-text').value=r.messages.join('\n');toast('下書きを入れました。直してから予約できます')}
+    catch(e){toast(e.message)}finally{b.disabled=false}
+  };
+  $('#p-go').onclick=async()=>{
+    const b=$('#p-go');b.disabled=true;
+    try{await api('push.create',{userId:$('#p-user').value,charId:$('#p-char').value,text:$('#p-text').value,deliverAt:new Date($('#p-at').value).toISOString()});toast('予約しました');viewPushes()}
+    catch(e){toast(e.message)}finally{b.disabled=false}
+  };
+  v.querySelectorAll('[data-c]').forEach(b=>b.onclick=async()=>{try{await api('push.cancel',{id:b.dataset.c});viewPushes()}catch(e){toast(e.message)}});
+}
+
+if(PW)enter().catch(()=>showLogin());else showLogin();
+</script>
+</body>
+</html>

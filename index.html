@@ -43,6 +43,8 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
 .av{width:var(--s);height:var(--s);border-radius:36%;flex-shrink:0;display:grid;place-items:center;background:var(--tb);color:var(--tf);font-weight:600;font-size:calc(var(--s)*.4)}
 [data-mode="night"] .av{filter:saturate(.85) brightness(.9)}
 .av.me{--tb:#E7E7EB;--tf:#6B6B73}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.av{overflow:hidden}
 .sec{display:flex;justify-content:space-between;align-items:center;padding:20px 20px 6px;font-size:13px;color:var(--sub)}
 .sec b{font-weight:500}
 
@@ -285,7 +287,8 @@ const LEVELS = [ // 親密度のしきい値
 ];
 
 const CHARS = Casts.list; // 定義は /casts.js が唯一の置き場（サーバーと共有）
-const charById = id => CHARS.find(c=>c.id===id);
+const GHOST = id => ({id, name:'削除されたAI', kana:'', job:'', store:'', catch:'', status:'', tags:[], ghost:true});
+const charById = id => CHARS.find(c=>c.id===id) || GHOST(id);
 
 /* ---------- 2. STORE ---------- */
 const KEY = 'yoruai.v1';
@@ -307,6 +310,37 @@ const Backend={client:null,ready:false,userId:null,displayId:null,pendingName:nu
 const ENGINE_FEATURES={
   persona:'人格と口調',relationship:'関係性',mood:'気分',memory:'長期記憶',initiative:'自発性'
 };
+// ---- 開発者画面で編集したキャストの取り込みと、AIからの連絡の受信
+async function loadCastRows(){
+  if(!Backend.client)return;
+  try{
+    const {data,error}=await Backend.client.from('casts').select('id,data,deleted');
+    if(error)throw error;
+    CHARS.splice(0,CHARS.length,...Casts.merge(data));
+  }catch(e){console.warn('casts not loaded',e?.message||e)}
+}
+async function checkPushes(){
+  if(!Backend.ready||!Backend.client||Backend.pushing)return;
+  Backend.pushing=true;
+  try{
+    const {data,error}=await Backend.client.from('admin_pushes').select('id,char_id,text')
+      .is('delivered_at',null).lte('deliver_at',new Date().toISOString()).order('deliver_at').limit(20);
+    if(error)throw error;
+    for(const p of data||[]){
+      const f=S.friends.find(x=>x.charId===p.char_id);
+      if(!f)continue;                                  // まだ友達でなければ、友達になるまで保留
+      const {error:upErr}=await Backend.client.from('admin_pushes').update({delivered_at:new Date().toISOString()}).eq('id',p.id);
+      if(upErr)continue;                               // 既読化できなければ重複を避けて届けない
+      String(p.text).split('\n').map(x=>x.trim()).filter(Boolean).slice(0,6)
+        .forEach((text,i)=>setTimeout(()=>pushMsg(f.id,{from:'ai',text,ts:Date.now()}),i*900));
+    }
+  }catch(e){console.warn('pushes not checked',e?.message||e)}
+  finally{Backend.pushing=false}
+}
+async function syncRemote(){const before=JSON.stringify(CHARS);await loadCastRows();if(JSON.stringify(CHARS)!==before)refresh();checkPushes()}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncRemote()});
+setInterval(()=>{if(!document.hidden&&Backend.ready)syncRemote()},60000);
+
 function ensureEngine(){
   if(!S.engine||typeof S.engine!=='object')S.engine={};
   const e=S.engine;
@@ -421,12 +455,14 @@ async function connectUser(userId){
       S.me.name=Backend.pendingName;
       Backend.pendingName=null;
     }
+    await loadCastRows();
     Backend.ready=true;
     localStorage.setItem(KEY,JSON.stringify(cleanState()));
     save();
     document.getElementById('auth-gate')?.classList.remove('show');
     applyMode();refresh();toast('クラウド接続完了');
     resumePendingReplies();
+    checkPushes();
     setTimeout(()=>maybeNudgeOnReturn(),1800);
   }catch(e){
     console.error('Supabase connection failed',e);
@@ -718,8 +754,12 @@ const TONES = {kokoa:['#F7DCE2','#B23A57'], rena:['#DFE3EC','#3F4B68'], yume:['#
                ren:['#E4E0F2','#4F4290'], nagi:['#D8EAE7','#2E6660'], mao:['#F6E0D8','#A1482D']};
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const tv = c => `--tb:${TONES[c.id][0]};--tf:${TONES[c.id][1]}`;
-const av = (c,s) => `<span class="av" style="--s:${s}px;${tv(c)}">${esc(c.name[0])}</span>`;
+const toneOf = c => TONES[c.id] || Object.values(TONES)[[...String(c.id)].reduce((a,ch)=>a+ch.charCodeAt(0),0) % Object.keys(TONES).length];
+const tv = c => `--tb:${toneOf(c)[0]};--tf:${toneOf(c)[1]}`;
+const safeIcon = u => /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(u||'') ? u : '';
+const av = (c,s) => safeIcon(c.icon)
+  ? `<span class="av" style="--s:${s}px;${tv(c)}"><img alt="" src="${safeIcon(c.icon)}"></span>`
+  : `<span class="av" style="--s:${s}px;${tv(c)}">${esc(c.name[0])}</span>`;
 const meAv = s => `<span class="av me" style="--s:${s}px">${esc((S.me.name||'あ')[0])}</span>`;
 const hhmm = ts => { const d=new Date(ts); return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0') };
 const dayLabel = ts => { const d=new Date(ts), n=new Date();
@@ -761,7 +801,7 @@ function renderTab(){
 }
 
 function homeView(){
-  const fr = S.friends.map(f=>({f,c:charById(f.charId)}));
+  const fr = S.friends.map(f=>({f,c:charById(f.charId)})).filter(x=>!x.c.ghost);
   const reco = CHARS.filter(c=>!friend(c.id));
   return `<div class="hd"><h1>ホーム</h1><button class="ib ac" data-act="add" aria-label="友だち追加">${IC.addp}</button></div>
   <button class="mine" data-tab="set">${meAv(60)}<div class="tx"><div class="t1">${esc(S.me.name)}</div><div class="t2">${esc(S.me.status||'ステータスメッセージを入力')}</div></div></button>
@@ -774,7 +814,7 @@ function homeView(){
 }
 
 function talkView(){
-  const list = S.friends.map(f=>({f,c:charById(f.charId),m:lastMsg(f.id)})).filter(x=>x.m).sort((a,b)=>b.m.ts-a.m.ts);
+  const list = S.friends.map(f=>({f,c:charById(f.charId),m:lastMsg(f.id)})).filter(x=>x.m&&!x.c.ghost).sort((a,b)=>b.m.ts-a.m.ts);
   return `<div class="hd"><h1>トーク</h1><button class="ib ac" data-act="add" aria-label="友だち追加">${IC.addp}</button></div>
   ${list.length ? list.map(({f,c,m})=>`<button class="row trow" data-act="chat" data-id="${f.id}">${av(c,52)}
      <div class="tx"><div class="top"><span class="t1">${esc(c.name)}</span><span class="tm">${listTime(m.ts)}</span></div>

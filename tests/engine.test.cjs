@@ -84,3 +84,15 @@ test('relation.note describes bias, not just level',()=>{
   assert.match(R.note({closeness:40,trust:40,attraction:40,comfort:40,tension:15}),/わだかまり/);
   assert.equal(R.note(null),'');
 });
+
+test('admin casts: DB rows add, override and remove casts; builtin defaults restore',()=>{
+  E.setCasts([{id:'hana',data:{name:'花',job:'キャバ嬢',life:[]},deleted:false},{id:'nagi',data:{},deleted:true},{id:'mao',data:{job:'変更'},deleted:false}]);
+  assert.ok(E.CASTS.hana&&E.CASTS.hana.life.length>=1&&E.CASTS.hana.tone,'custom cast gets safe persona defaults');
+  assert.equal(E.CASTS.nagi,undefined);
+  assert.equal(E.CASTS.mao.job,'変更');
+  assert.ok(E.CASTS.mao.values,'override keeps builtin persona');
+  const st=E.initialState('hana',Date.now(),'match');
+  assert.ok(st.mood.reason);
+  E.setCasts([]);
+  assert.equal(Object.keys(E.CASTS).length,6);assert.equal(E.CASTS.hana,undefined);
+});

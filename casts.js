@@ -31,7 +31,19 @@
   ];
   const byId={};
   for(const c of list)byId[c.id]=Object.freeze(c);
-  const api={list:list.map(c=>byId[c.id]),byId};
+  // 開発者画面（DB）で追加・編集・削除されたキャストを重ねる。rows: [{id,data,deleted}]
+  // 組み込みキャストは data で上書きでき、deleted:true で非表示にできる。
+  const merge=rows=>{
+    const out={};
+    for(const c of list)out[c.id]={...c};
+    for(const r of Array.isArray(rows)?rows:[]){
+      if(!r||typeof r.id!=='string')continue;
+      if(r.deleted){delete out[r.id];continue;}
+      out[r.id]={...(out[r.id]||{}),...(r.data&&typeof r.data==='object'?r.data:{}),id:r.id};
+    }
+    return Object.values(out);
+  };
+  const api={list:list.map(c=>byId[c.id]),byId,merge};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   if(root)root.Casts=api;
 })(typeof window!=='undefined'?window:null);
