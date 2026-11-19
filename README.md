@@ -1,24 +1,48 @@
 # yoruAI
 
-夜職AIとLINE風にトークできるアプリ（プロトタイプ）。`index.html` 1ファイルで動く。
+夜職AIキャストとLINE風に会話するプロトタイプ。既存のUIは `index.html` にあり、チャット生成はVercel Functions経由で行う。
 
-## 画面
-- **ホーム**：自分のプロフィール / 友だち一覧 / 知り合いかも？（未追加のAI）
-- **トーク**：トーク一覧（未読バッジ・最終メッセージ）→ トークルーム
-- **設定**：名前・性別・ひとこと / 表示（ライト・ダーク）/ AI設定（モック or Gemini）/ リセット
-- **友だち追加**：キャラカードを横スワイプ → 出会い方（初回・ナンパ・マッチングアプリ）を選んで追加
-  - 追加すると、少し後に向こうから出会い方に合わせた最初のメッセージが届く
+## 構成
 
-## コードの構成（`index.html` の `<script>` 内）
-1. **DATA** — `CHARS`（キャラ定義）、`MEETS`（出会い方と親密度の初期値）、`LEVELS`（親密度の段階）
-2. **STORE** — `localStorage` のキー `yoruai.v1` に全状態を保存
-3. **AI** — `generateReply(friend, history)` が返信生成の**唯一の窓口**。戻り値は吹き出し文字列の配列
-   - `mockReply`：キーワードで固定セリフを返す
-   - `geminiReply`：Gemini API（`generateContent`）を直接呼ぶテスト用接続。キャラ設定は `buildSystemPrompt` で組み立て
-4. **CHAT** — 送信 → 既読 → 入力中 → 返信 の流れ（`sendMsg` / `respond`）。親密度は送信ごとに加算
-5. **VIEWS** — 各画面の描画
+- `index.html`: 友だち追加・出会い方・トーク画面。Supabase Auth、クラウド同期のクライアント処理
+- `api/config.js`: 公開してよいSupabase URL / Publishable Keyをブラウザへ渡す
+- `api/chat.js`: Supabase Authトークンを検証し、Gemini APIでキャスト返信を生成する
+- Supabase `public.app_states`: 各ユーザーの現在の画面状態とトーク履歴をJSONBで保存（RLS有効）
 
-## システム側で差し替えるところ
-- 会話AIを本実装にするときは `generateReply` の中身だけ差し替えればよい
-- APIキーを隠すなら、Vercelのサーバーレス関数（`/api/chat`）を作り、`geminiReply` の `fetch` 先をそこに変える
-- キャラを増やすときは `CHARS` に1件追加するだけ（`opens` に出会い方ごとの最初のメッセージを入れる）
+## Vercelの環境変数（Production）
+
+| 変数 | 内容 |
+| --- | --- |
+| `GEMINI_API_KEY` | **非公開**・サーバー側でのみ利用 |
+| `NEXT_PUBLIC_SUPABASE_URL` | SupabaseプロジェクトURL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase Publishable Key |
+| `GEMINI_MODEL` (任意) | 未設定なら `gemini-3.8-flash` |
+
+## Supabase Auth
+
+最初に既存セッションを読み、無ければ匿名サインインを試す。
+匿名サインインが無効の場合はメールOTPのログイン画面を表示する。
+
+匿名で即利用させるなら、Supabase Dashboard → Authentication → Providers → Anonymous Sign-Ins を有効にする。
+メールのログインリンクを利用する場合は、SupabaseのRedirect URLに本番サイトを登録する。
+
+匿名ユーザーはブラウザのセッションを失うと、そのアカウントのデータを引き継げない。
+複数端末対応や一般公開前には永続的なログイン方法とアカウント連携を実装すること。
+
+## セキュリティと運用
+
+- Gemini APIキーをHTML/ブラウザへ配布しない。旧プロトタイプの保存キーは読み込み時に除去する。
+- Supabaseの`app_states`には`auth.uid()=user_id`のRLSがある。
+- 会話データはブラウザにもキャッシュし、初回ログイン時にクラウドへ保存する。
+- APIは本人確認と入力長チェックを行う。Vercel関数のメモリ内制限は**本番向けの厳密なレート制限ではない**ので、一般公開前に分散型のAPI利用制限を追加する。
+- 最初のMVPはJSONB状態保存。今後、メッセージ検索・分析・長期記憶を実装する際に正規化を検討する。
+- Geminiの無料枠では、Googleによるデータ利用条件に注意し、実ユーザーの機微な会話を扱う前にプランを確認する。
+
+## 動作確認
+
+1. 認証が完了すること
+2. キャストを追加し、Gemini返信が届くこと
+3. リロードしても友だち・トーク履歴が維持されること
+4. 別ユーザーのデータをRLSで読めないこと
+
+UIのデザインは、Geminiの接続やDB実装とは独立して改善できる。
