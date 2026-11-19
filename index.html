@@ -386,10 +386,10 @@ const charById = id => CHARS.find(c=>c.id===id);
 
 /* ---------- 2. STORE ---------- */
 const KEY = 'yoruai.v1';
-const GENDERS = {male:'男性', female:'女性', other:'その他', none:'答えない'};
-const DEFAULT = {me:{name:'あなた', status:'', gender:'none'}, mode:'light', ai:{provider:'mock', key:'', model:'gemini-2.5-flash'}, friends:[], msgs:{}};
+const GENDERS = {male:'男性', female:'女性'};
+const DEFAULT = {me:{name:'あなた', status:'', gender:'male'}, mode:'light', ai:{provider:'mock', key:'', model:'gemini-2.5-flash'}, friends:[], msgs:{}};
 let S = load();
-function load(){ try{ const d=structuredClone(DEFAULT), j=JSON.parse(localStorage.getItem(KEY))||{}; const o=Object.assign(d,j); o.me=Object.assign(structuredClone(DEFAULT.me), j.me||{}); if(!['light','night'].includes(o.mode)) o.mode='light'; return o }catch(e){ return structuredClone(DEFAULT) } }
+function load(){ try{ const d=structuredClone(DEFAULT), j=JSON.parse(localStorage.getItem(KEY))||{}; const o=Object.assign(d,j); o.me=Object.assign(structuredClone(DEFAULT.me), j.me||{}); if(!['light','night'].includes(o.mode)) o.mode='light'; if(!GENDERS[o.me.gender]) o.me.gender='male'; return o }catch(e){ return structuredClone(DEFAULT) } }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)) }catch(e){} }
 const friend = id => S.friends.find(f=>f.id===id);
 const levelOf = aff => { let l=0; LEVELS.forEach((x,i)=>{ if(aff>=x.min) l=i }); return l };
@@ -410,7 +410,7 @@ function buildSystemPrompt(f){
   return `あなたは「${c.name}（${c.kana}）」。${c.store}で働く${c.job}。
 性格・口調: ${c.tone.replaceAll('{name}', S.me.name)}
 相手の呼び名: ${S.me.name}
-相手の性別: ${S.me.gender==='none'?'不明（性別を決めつけた言い方をしない）':GENDERS[S.me.gender]}
+相手の性別: ${GENDERS[S.me.gender]}
 出会い方: ${m.label}（${m.desc}）。この出会い方に合った距離感で話す。
 現在の親密度: ${lv.name}（${f.aff}/100）。親密度が低いうちは少し距離を置き、上がるほど打ち解ける。
 ルール:
@@ -566,7 +566,7 @@ function homeView(){
   const fr = S.friends.map(f=>({f,c:charById(f.charId),t:(lastMsg(f.id)||{ts:f.addedAt}).ts})).sort((a,b)=>a.t-b.t);
   const reco = CHARS.filter(c=>!friend(c.id));
   return `<div class="hd"><h1>名刺入れ</h1><button class="fab" data-act="add" aria-label="友だち追加">${I.plus}</button></div>
-  <button class="mycard" data-tab="set">${meSeal(48)}<div><div class="nm">${esc(S.me.name)}</div><div class="st">${esc(S.me.status||'ひとことを設定')}</div></div>${S.me.gender!=='none'?`<span class="gd">${GENDERS[S.me.gender]}</span>`:''}</button>
+  <button class="mycard" data-tab="set">${meSeal(48)}<div><div class="nm">${esc(S.me.name)}</div><div class="st">${esc(S.me.status||'ひとことを設定')}</div></div><span class="gd">${GENDERS[S.me.gender]}</span></button>
   <div class="sec"><h2>もらった名刺</h2><span>${fr.length}枚</span></div>
   ${fr.length ? `<div class="wallet">${fr.map(({f,c})=>meishi(c,f,`role="button" tabindex="0" data-act="profile" data-id="${f.id}"`)).join('')}</div>`
    : `<div class="wallet-empty"><span>まだ名刺がありません。<br>気になる相手から受け取ってみよう。</span><button class="pill" data-act="add">名刺を受け取る</button></div>`}
