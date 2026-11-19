@@ -348,7 +348,7 @@ function load(){try{
   const d=structuredClone(DEFAULT),j=JSON.parse(localStorage.getItem(KEY))||{},o=Object.assign(d,j);
   o.me=Object.assign(structuredClone(DEFAULT.me),j.me||{});
   o.ai=Object.assign(structuredClone(DEFAULT.ai),j.ai||{});
-  if(o.ai.provider==='mock'&&!o.ai.manualMock)o.ai.provider='gemini';
+  o.ai.provider='gemini'; delete o.ai.manualMock;
   o.ai.key=''; // clear any old API key saved in this prototype
   localStorage.setItem(KEY,JSON.stringify(o));
   if(!['light','night'].includes(o.mode))o.mode='light';
@@ -356,7 +356,7 @@ function load(){try{
   return o;
 }catch(e){return structuredClone(DEFAULT)} }
 const Backend={client:null,ready:false,userId:null,hydrating:false,saveTimer:null,queue:Promise.resolve()};
-function cleanState(){const copy=structuredClone(S);copy.ai=Object.assign({},copy.ai,{key:''});return copy}
+function cleanState(){const copy=structuredClone(S);copy.ai=Object.assign({},copy.ai,{key:'',provider:'gemini'});delete copy.ai.manualMock;return copy}
 function save(){
   S.ai.key='';
   try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
@@ -407,7 +407,7 @@ async function connectUser(userId){
       S=Object.assign(structuredClone(DEFAULT),existing);
       S.me=Object.assign(structuredClone(DEFAULT.me),existing.me||{});
       S.ai=Object.assign(structuredClone(DEFAULT.ai),existing.ai||{});
-      S.ai.key='';
+      S.ai.key=''; S.ai.provider='gemini'; delete S.ai.manualMock;
     }else{
       const {error:writeError}=await Backend.client.from('app_states').upsert({user_id:userId,state:cleanState()});
       if(writeError)throw writeError;
@@ -451,18 +451,16 @@ const levelOf = aff => { let l=0; LEVELS.forEach((x,i)=>{ if(aff>=x.min) l=i });
 
 /* ---------- 3. AI ---------- */
 // 返信生成の唯一の窓口。戻り値は「吹き出しの配列」。
-async function generateReply(f,history){
-  if(S.ai.provider==='gemini')return geminiReply(f,history);
-  await wait(700+Math.random()*1300);
-  return mockReply(f,history);
+async function generateReply(f,history,initialGreeting=false){
+  return geminiReply(f,history,initialGreeting);
 }
-async function geminiReply(f,history){
+async function geminiReply(f,history,initialGreeting=false){
   if(!Backend.ready||!Backend.client)throw new Error('クラウドへの接続が必要です');
   const {data:{session},error:authError}=await Backend.client.auth.getSession();
   if(authError||!session?.access_token)throw new Error('ログインが必要です');
   const payload={
     charId:f.charId,meet:f.meet,affinity:f.aff,
-    userName:S.me.name,userGender:S.me.gender,
+    userName:S.me.name,userGender:S.me.gender,initialGreeting,
     history:history.filter(m=>m.from==='me'||m.from==='ai').slice(-24).map(m=>({from:m.from,text:m.text}))
   };
   const res=await fetch('/api/chat',{
@@ -476,32 +474,9 @@ async function geminiReply(f,history){
   return result.messages;
 }
 
-const CATS = [
-  ['night', /おやすみ|寝る|ねる|寝よ|ねよ/],
-  ['tired', /疲れ|つかれ|しんど|眠い|ねむい|だる/],
-  ['love',  /好き|すき|かわい|可愛|かっこい|愛して|タイプ/],
-  ['meet',  /会い|行く|行こ|いく|お店|出勤|今日いる|来て/],
-  ['food',  /ご飯|ごはん|飯|お腹|腹減|食べ|ランチ|飲み/],
-  ['work',  /仕事|しごと|会社|残業|バイト|学校/],
-  ['q',     /[?？]\s*$/],
-  ['greet', /おはよ|こんにち|こんばん|やっほ|ただいま|ひさしぶり|久しぶり/],
-
-];
-let lastPick = {};
-function mockReply(f, history){
-  const c = charById(f.charId);
-  const t = [...history].reverse().find(m=>m.from==='me')?.text || '';
-  const cat = (CATS.find(([,re])=>re.test(t))||['etc'])[0];
-  const pool = c.r[cat] || c.r.etc;
-  let pick = pool[Math.floor(Math.random()*pool.length)];
-  if(pool.length>1 && pick===lastPick[f.id]) pick = pool[(pool.indexOf(pick)+1)%pool.length];
-  lastPick[f.id] = pick;
-  return [pick.replaceAll('{name}', S.me.name)];
-}
-
 /* ---------- 4. CHAT FLOW ---------- */
 const wait = ms => new Promise(r=>setTimeout(r,ms));
-const busy = {}, typing = {};
+const busy = {}, typing = {}, greetBusy = {};
 let openChatId = null, tab = 'home';
 
 function pushMsg(fid, m){
@@ -520,7 +495,7 @@ function sendMsg(fid, text){
   const after = levelOf(f.aff);
   if(after>before) pushMsg(fid, {from:'sys', text:`💗 親密度が「${LEVELS[after].name}」になった`, ts:Date.now()});
   save();
-  respond(fid);
+  if(!greetBusy[fid]) respond(fid);
 }
 
 async function respond(fid){
@@ -555,8 +530,33 @@ function addFriend(charId, meet){
   S.friends.push({id, charId, meet, aff:MEETS[meet].start, addedAt:Date.now(), unread:0});
   S.msgs[id] = [{from:'sys', text:`${MEETS[meet].icon} ${MEETS[meet].label}で出会った`, ts:Date.now()}];
   save();
-  const c = charById(charId);
-  setTimeout(()=>pushMsg(id, {from:'ai', text:c.opens[meet], ts:Date.now()}), 1600);
+  startGreeting(id,S.friends.find(f=>f.id===id).addedAt);
+}
+async function startGreeting(fid,addedAt){
+  greetBusy[fid]=true;
+  try{
+    await wait(900);
+    const f=friend(fid);
+    if(!f || f.addedAt!==addedAt)return;
+    if((S.msgs[fid]||[]).some(m=>m.from==='me'))return;
+    typing[fid]=true;refresh();
+    const parts=await generateReply(f,[],true);
+    if(friend(fid)?.addedAt!==addedAt)return;
+    if((S.msgs[fid]||[]).some(m=>m.from==='me'))return;
+    for(const text of parts){
+      pushMsg(fid,{from:'ai',text,ts:Date.now()});
+    }
+  }catch(e){
+    console.error('Greeting generation failed',e);
+    if(friend(fid)?.addedAt===addedAt)pushMsg(fid,{
+      from:'sys',text:'⚠️ 最初のAIメッセージ生成エラー: '+String(e.message||e).slice(0,100),ts:Date.now()
+    });
+  }finally{
+    typing[fid]=false;
+    delete greetBusy[fid];
+    refresh();
+    if(friend(fid)?.addedAt===addedAt&&(S.msgs[fid]||[]).some(m=>m.from==='me'))respond(fid);
+  }
 }
 
 /* ---------- 5. VIEWS ---------- */
@@ -644,16 +644,12 @@ function setView(){
     <button class="${S.mode==='light'?'on':''}" data-act="mode" data-id="light">ライト</button>
     <button class="${S.mode==='night'?'on':''}" data-act="mode" data-id="night">ダーク</button></div></div></div>
   <div class="sec"><b>会話AI（テスト）</b></div>
-  <div class="grp">
-    <div class="cell"><label>返信</label><span class="sp"></span><div class="seg">
-      <button class="${S.ai.provider==='mock'?'on':''}" data-act="prov" data-id="mock">固定</button>
-      <button class="${S.ai.provider==='gemini'?'on':''}" data-act="prov" data-id="gemini">Gemini</button></div></div>
-    ${S.ai.provider==='gemini'?`<div class="cell"><label>AI接続</label><span>サーバー経由のGemini</span></div>`:''}
-  </div>
-  <p class="foot">${S.ai.provider==='gemini'?'APIキーはサーバー側で管理します。':'固定は、送った言葉に合わせて用意したセリフから返します。'}</p>
+  <div class="grp"><div class="cell"><label>返信エンジン</label><span>Gemini（サーバー接続）</span></div>
+  <div class="cell"><label>クラウド保存</label><span>${Backend.ready?'接続済み':'接続待ち'}</span></div></div>
+  <p class="foot">固定返信は停止しています。返答はGeminiが生成します。APIキーはサーバー側で管理します。</p>
   <div class="sec"><b>データ</b></div>
   <div class="grp"><button class="danger" data-act="reset">友だちとトークをすべて削除</button></div>
-  <p class="foot" style="padding-bottom:28px">yoruAI 0.3</p></div>`;
+  <p class="foot" style="padding-bottom:28px">yoruAI 0.4</p></div>`;
 }
 
 /* --- トークルーム --- */
@@ -780,7 +776,6 @@ document.addEventListener('click', e=>{
     case 'remeet': openAdd(id); break;
     case 'gender': S.me.gender=id; save(); refresh(); break;
     case 'mode': S.mode=id; save(); applyMode(); refresh(); break;
-    case 'prov': S.ai.provider=id; S.ai.manualMock=(id==='mock'); save(); refresh(); break;
     case 'reset':
       if(t.dataset.armed){ S=structuredClone(DEFAULT); save(); applyMode(); tab='home'; refresh(); toast('削除しました') }
       else { t.dataset.armed=1; t.textContent='もう一度押すと削除します（元に戻せません）' }
