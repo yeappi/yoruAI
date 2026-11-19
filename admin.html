@@ -269,7 +269,7 @@ function viewConvo(){
   const a=f?c.actors[f.id]:null;
   v.innerHTML=`<div class="top"><button class="back" id="back">‹ 戻る</button><h1>${esc(u.name||'（名前なし）')}</h1><button class="btn sub" id="reload">更新</button></div>
   <div class="chips">${u.friends.map(x=>`<button data-f="${esc(x.id)}" class="${x.id===c.sel?'on':''}">${esc(c.casts[x.charId]?.name||x.charId)}</button>`).join('')||'<span class="note">友達がいません</span>'}</div>
-  ${f?`<div class="msgs" id="msgs">${msgs.map(m=>`<div class="b ${m.from==='ai'?'ai':'me'}">${esc(m.text)}<small>${fmt(m.ts)}</small></div>`).join('')||'<span class="note">まだ会話がありません</span>'}</div>
+  ${f?`<div class="msgs" id="msgs">${msgs.map(m=>`<div class="b ${m.from==='ai'?'ai':'me'}">${m.img&&/^https:\/\//.test(m.img)?`<a href="${esc(m.img)}" target="_blank" rel="noopener"><img src="${esc(m.img)}" alt="写真" style="display:block;max-width:100%;max-height:220px;border-radius:10px;margin-bottom:4px"></a>`:''}${esc(m.text)}<small>${fmt(m.ts)}</small></div>`).join('')||'<span class="note">まだ会話がありません</span>'}</div>
   <h2>状態</h2><div class="state"><b>関係:</b> ${esc(Relation.note(a?.relationship)||'まだ記録なし')}${a?.relationship?`<br>${Object.entries(a.relationship).map(([k,x])=>k+' '+Math.round(x)).join(' / ')}`:''}
     ${a?.mood?`<br><b>気分:</b> ${a.mood.valence>0?'+':''}${a.mood.valence}・元気 ${Math.round(a.mood.energy)}（${esc(a.mood.reason||'')}）`:''}
     ${a?.memories?.length?`<br><b>記憶:</b> ${a.memories.slice(-6).map(m=>esc(m.text)).join(' / ')}`:''}

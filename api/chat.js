@@ -21,7 +21,7 @@ function hit(key, limit, windowMs) {
 module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({error:'Method not allowed'});
-  if (Number(req.headers['content-length'] || 0) > 100000) return res.status(413).json({error:'Request too large'});
+  if (Number(req.headers['content-length'] || 0) > 1500000) return res.status(413).json({error:'Request too large'});
   const apiKey = process.env.GEMINI_API_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;

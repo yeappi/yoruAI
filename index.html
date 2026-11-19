@@ -145,6 +145,16 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
 .send{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--faint);flex-shrink:0}
 .send.on{color:var(--accent)}
 .send svg{width:24px;height:24px}
+.att{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--sub);flex-shrink:0}
+.att svg{width:24px;height:24px}
+.att:disabled{opacity:.4}
+.m .b.pic{padding:3px;background:transparent!important;box-shadow:none!important;max-width:62%}
+.m .b.pic img{display:block;max-width:100%;max-height:300px;border-radius:16px;cursor:zoom-in;background:var(--fill)}
+.m .b.pic .cap{padding:6px 10px 3px;white-space:pre-wrap}
+.m.me .b.pic .cap{background:var(--accent);color:#fff;border-radius:14px;margin-top:3px;display:inline-block}
+.m.ai .b.pic .cap{background:var(--ai);color:var(--text);border-radius:14px;margin-top:3px;display:inline-block}
+#lightbox{position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.92);display:grid;place-items:center}
+#lightbox img{max-width:100%;max-height:100%;object-fit:contain}
 
 /* ---------- プロフィール ---------- */
 #profile{background:var(--tb)}
@@ -497,6 +507,54 @@ const levelOf = aff => { let l=0; LEVELS.forEach((x,i)=>{ if(aff>=x.min) l=i });
 
 /* ---------- 3. AI ---------- */
 // 返信生成の唯一の窓口。戻り値は「吹き出しの配列」。
+/* --- 画像 --- */
+const PIC_LABEL='📷 写真';
+const imgB64={};
+function blobToB64(blob){return new Promise((ok,ng)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]||'');r.onerror=ng;r.readAsDataURL(blob)})}
+async function resizeImage(file,maxEdge=1024,quality=.8){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((ok,ng)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>ng(new Error('画像を読み込めませんでした'));i.src=url});
+    const k=Math.min(1,maxEdge/Math.max(img.naturalWidth,img.naturalHeight));
+    const w=Math.max(1,Math.round(img.naturalWidth*k)),h=Math.max(1,Math.round(img.naturalHeight*k));
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+    const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,w,h);g.drawImage(img,0,0,w,h);
+    const blob=await new Promise(ok=>cv.toBlob(ok,'image/jpeg',quality));
+    if(!blob)throw new Error('画像を変換できませんでした');
+    return blob;
+  }finally{URL.revokeObjectURL(url)}
+}
+async function uploadImage(blob){
+  const {data:{session}}=await Backend.client.auth.getSession();
+  const uid=session?.user?.id;if(!uid)throw new Error('ログインが必要です');
+  const path=uid+'/'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)+'.jpg';
+  const {error}=await Backend.client.storage.from('chat-images').upload(path,blob,{contentType:'image/jpeg',upsert:false});
+  if(error)throw new Error('アップロードに失敗しました');
+  const url=Backend.client.storage.from('chat-images').getPublicUrl(path).data.publicUrl;
+  imgB64[url]=await blobToB64(blob);
+  return url;
+}
+async function imageData(url){
+  if(imgB64[url])return imgB64[url];
+  const r=await fetch(url);if(!r.ok)throw new Error('画像を取得できませんでした');
+  return imgB64[url]=await blobToB64(await r.blob());
+}
+// 返信待ちの最後のまとまり（末尾の自分のメッセージ）に含まれる写真だけをAIに見せる。
+async function trailingImages(history){
+  const urls=[];
+  const rows=history.filter(m=>m.from==='me'||m.from==='ai');
+  for(let i=rows.length-1;i>=0&&rows[i].from==='me';i--)if(rows[i].img)urls.unshift(rows[i].img);
+  const out=[];
+  for(const u of urls.slice(-3)){
+    try{out.push({mime:'image/jpeg',data:await imageData(u)})}catch(e){console.warn('image skipped',e.message)}
+  }
+  return out;
+}
+function openLightbox(src){
+  const d=document.createElement('div');d.id='lightbox';d.innerHTML='<img alt="写真">';
+  d.firstChild.src=src;d.onclick=()=>d.remove();document.body.appendChild(d);
+}
+
 async function requestEngine(f,history,options={}){
   if(!Backend.ready||!Backend.client)throw new Error('クラウドへの接続が必要です');
   const {data:{session},error:authError}=await Backend.client.auth.getSession();
@@ -507,7 +565,8 @@ async function requestEngine(f,history,options={}){
     userName:S.me.name,userGender:S.me.gender,
     initialGreeting:options.initialGreeting===true,
     mode:options.mode||'reply',baseline:options.baseline===true,
-    history:history.filter(m=>m.from==='me'||m.from==='ai').slice(-24).map(m=>({from:m.from,text:m.text})),
+    history:history.filter(m=>m.from==='me'||m.from==='ai').slice(-24).map(m=>({from:m.from,text:m.img?'（写真を送った）'+(m.text===PIC_LABEL?'':'\n'+m.text):m.text})),
+    images:options.mode==='nudge'||options.initialGreeting===true?[]:await trailingImages(history),
     engineState:actorState(f.id),profile:ensureEngine().profile||null,
     engineSettings:{flags:e.settings.flags,styleNote:e.settings.styleNote}
   };
@@ -562,7 +621,7 @@ let openChatId = null, tab = 'home';
 function pushMsg(fid, m){
   (S.msgs[fid] ||= []).push(m);
   const f = friend(fid);
-  if(m.from==='ai' && f && openChatId!==fid){ f.unread=(f.unread||0)+1; banner(f,m.text) }
+  if(m.from==='ai' && f && openChatId!==fid){ f.unread=(f.unread||0)+1; banner(f,m.img?'📷 写真':m.text) }
   save(); refresh();
 }
 
@@ -655,12 +714,12 @@ function resumePendingReplies(){
   }
   save();
 }
-function sendMsg(fid,text){
+function sendMsg(fid,text,img){
   if(!Backend.ready){toast('接続を準備中です');return}
   const prev=(S.msgs[fid]||[]).filter(m=>m.from==='me'||m.from==='ai');
   const last=prev.length?prev[prev.length-1].ts:0;
   const previousUserAt=prev.filter(m=>m.from==='me').slice(-1)[0]?.ts||0;
-  pushMsg(fid,{from:'me',text,ts:Date.now(),read:false});
+  pushMsg(fid,img?{from:'me',text:text||PIC_LABEL,img,ts:Date.now(),read:false}:{from:'me',text,ts:Date.now(),read:false});
   if(!greetBusy[fid])planResponse(fid,{lastInteractionAt:last,previousUserAt});
 }
 async function deliverPending(fid,plan){
@@ -784,6 +843,7 @@ const IC = {
   menu:svg('<path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
   send:svg('<path d="M12 19V6M6.5 11.5 12 6l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'),
   talk:svg(I.talk[0]),
+  img:svg('<rect x="3.5" y="5" width="17" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10.5" r="1.7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 17l4.6-4.4 3.2 3 2.6-2.5L19.5 17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'),
   redo:svg('<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9M4.5 4.5V9H9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'),
 };
 
@@ -862,16 +922,35 @@ function openChat(fid){
     <div class="ttl">${esc(c.name)}<small id="c-sub"></small></div>
     <button class="ib" data-act="profile" data-id="${fid}" aria-label="プロフィール">${IC.menu}</button></div>
     <div id="msgs"></div>
-    <form class="cin" id="cin"><textarea id="inp" rows="1" placeholder="メッセージを入力" aria-label="メッセージ"></textarea><button class="send" id="sendb" aria-label="送信">${IC.send}</button></form>`;
+    <form class="cin" id="cin"><button type="button" class="att" id="attb" aria-label="写真を送る">${IC.img}</button><input type="file" id="pick" accept="image/*" hidden><textarea id="inp" rows="1" placeholder="メッセージを入力" aria-label="メッセージ"></textarea><button class="send" id="sendb" aria-label="送信">${IC.send}</button></form>`;
   $('#chat').classList.add('open'); $('#profile').classList.remove('open');
   renderMsgs(true); refresh();
   const inp = $('#inp');
   inp.oninput = ()=>{ inp.style.height='auto'; inp.style.height=inp.scrollHeight+'px'; $('#sendb').classList.toggle('on', !!inp.value.trim()) };
   inp.onkeydown = e=>{ if(e.key==='Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); $('#cin').requestSubmit() } };
+  $('#attb').onclick = ()=>{ if(!Backend.ready){toast('接続を準備中です');return} $('#pick').click() };
+  $('#pick').onchange = async e=>{
+    const file = e.target.files && e.target.files[0]; e.target.value='';
+    if(!file) return;
+    if(!/^image\//.test(file.type)){ toast('画像を選んでください'); return }
+    const b=$('#attb'); b.disabled=true; toast('写真を送信中…');
+    try{
+      const blob = await resizeImage(file);
+      const url = await uploadImage(blob);
+      const cap = inp.value.trim(); inp.value=''; inp.oninput();
+      sendMsg(fid, cap, url);
+    }catch(err){ toast(err.message||'送れませんでした') }
+    finally{ b.disabled=false }
+  };
   $('#cin').onsubmit = e=>{ e.preventDefault(); const v=inp.value.trim(); if(!v) return; if(!Backend.ready){toast('接続を準備中です');return} inp.value=''; inp.oninput(); sendMsg(fid, v); inp.focus() };
 }
 function closeChat(){ openChatId=null; $('#chat').classList.remove('open'); refresh() }
 
+function bubble(m){
+  if(!m.img||!/^https:\/\//.test(m.img)) return `<div class="b">${esc(m.text)}</div>`;
+  const cap = m.text && m.text!==PIC_LABEL ? `<div class="cap">${esc(m.text)}</div>` : '';
+  return `<div class="b pic"><img src="${esc(m.img)}" alt="写真" loading="lazy" data-zoom="1">${cap}</div>`;
+}
 function renderMsgs(force){
   const fid = openChatId, f = friend(fid); if(!f) return;
   const c = charById(f.charId), box = $('#msgs');
@@ -882,8 +961,8 @@ function renderMsgs(force){
     if(d!==lastDay){ html+=`<div class="dsep"><span>${d}</span></div>`; lastDay=d; prev=null }
     if(m.from==='sys'){ html+=`<div class="sys ${m.text.includes('親密度')?'up':''}">${esc(m.text.replace(/^\S+\s/,''))}</div>`; prev=null; continue }
     const first = prev!==m.from;
-    if(m.from==='me') html+=`<div class="m me ${first?'first':''}"><div class="meta">${m.read?'<span>既読</span>':''}<span>${hhmm(m.ts)}</span></div><div class="b">${esc(m.text)}</div></div>`;
-    else html+=`<div class="m ai ${first?'first':''}"><div class="aw">${first?av(c,36):''}</div><div class="col">${first?`<div class="nm">${esc(c.name)}</div>`:''}<div class="bw"><div class="b">${esc(m.text)}</div><div class="meta">${hhmm(m.ts)}</div></div></div></div>`;
+    if(m.from==='me') html+=`<div class="m me ${first?'first':''}"><div class="meta">${m.read?'<span>既読</span>':''}<span>${hhmm(m.ts)}</span></div>${bubble(m)}</div>`;
+    else html+=`<div class="m ai ${first?'first':''}"><div class="aw">${first?av(c,36):''}</div><div class="col">${first?`<div class="nm">${esc(c.name)}</div>`:''}<div class="bw">${bubble(m)}<div class="meta">${hhmm(m.ts)}</div></div></div></div>`;
     prev = m.from;
   }
   if(typing[fid]){ const first = prev!=='ai'; html+=`<div class="m ai typing ${first?'first':''}"><div class="aw">${first?av(c,36):''}</div><div class="col"><div class="b"><i></i><i></i><i></i></div></div></div>` }
@@ -956,6 +1035,7 @@ function applyMode(){
 
 /* ---------- EVENTS ---------- */
 document.addEventListener('click', e=>{
+  const z = e.target.closest('img[data-zoom]'); if(z){ openLightbox(z.src); return }
   const t = e.target.closest('[data-tab],[data-act],#banner'); if(!t) return;
   if(t.id==='banner'){ t.classList.remove('show'); closeAdd(); $('#profile').classList.remove('open'); openChat(t.dataset.id); return }
   if(t.dataset.tab){ tab=t.dataset.tab; refresh(); $('#tab').scrollTop=0; return }
