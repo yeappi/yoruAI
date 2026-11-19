@@ -145,3 +145,11 @@ test('Yapi can initiate closeness at low relationship without changing global ru
  const noPersona=E.build({charId:'yapi',character:E.CASTS.yapi,history:[],settings:{flags:{persona:false}}});
  assert.ok(!noPersona.system.includes('信頼は相談や弱さの共有'));
 });
+
+test('AI question: character deflects in character, never claims to be human',()=>{
+ const c=E.build({charId:'mao',character:E.CASTS.mao,history:[],settings:{flags:E.DEFAULT_FLAGS}});
+ assert.ok(!c.system.includes('正直に答える。現実の会う約束'));
+ assert.match(c.system,/キャストのまま|キャラのまま/);
+ assert.match(c.system,/断言はしない/);
+ assert.match(c.system,/現実の会う約束や実在する店の予約を装わない/);
+});

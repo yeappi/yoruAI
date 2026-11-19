@@ -145,6 +145,20 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
 .send{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--faint);flex-shrink:0}
 .send.on{color:var(--accent)}
 .send svg{width:24px;height:24px}
+.bx{display:flex;flex-direction:column;min-width:0;max-width:72%}
+.m.me .bx{align-items:flex-end}.m.ai .bx{align-items:flex-start}
+.m.me .bx .b{max-width:100%}
+.rq{max-width:100%;font-size:12px;line-height:1.4;color:var(--sub);background:var(--fill);border-left:3px solid var(--accent);border-radius:8px;padding:5px 9px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.rp{align-self:center;flex-shrink:0;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:12px;padding:5px 10px}
+.m.hl .b{animation:hl 1.2s}
+@keyframes hl{0%,60%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:none}}
+#rbar{display:flex;align-items:center;gap:10px;padding:7px 14px;background:var(--bg);border-top:1px solid var(--hair);flex-shrink:0}
+#rbar:empty{display:none}
+#rbar .rt{flex:1;min-width:0;border-left:3px solid var(--accent);padding-left:9px;font-size:12px;line-height:1.4}
+#rbar .rt b{display:block;color:var(--accent);font-weight:600}
+#rbar .rt span{display:block;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#rbar .rx{width:30px;height:30px;display:grid;place-items:center;color:var(--sub);flex-shrink:0}
+#rbar .rx svg{width:18px;height:18px}
 .att{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--sub);flex-shrink:0}
 .att svg{width:24px;height:24px}
 .att:disabled{opacity:.4}
@@ -510,6 +524,21 @@ const levelOf = aff => { let l=0; LEVELS.forEach((x,i)=>{ if(aff>=x.min) l=i });
 /* --- 画像 --- */
 const PIC_LABEL='📷 写真';
 const imgB64={};
+// サーバーに送る本文。写真・返信（引用）は文字の印にして、モデルが状況を読めるようにする。
+const wireText=m=>{
+  let t=m.img?'（写真を送った）'+(m.text===PIC_LABEL?'':'\n'+m.text):m.text;
+  if(m.re&&m.re.text) t='（「'+String(m.re.text).replace(/[「」\n]/g,' ').slice(0,50)+'」への返信）\n'+t;
+  return t;
+};
+const snippet=m=>(m.img?PIC_LABEL:String(m.text||'')).replace(/\s+/g,' ').trim().slice(0,50);
+const replyDraft={};let selMsgId=null;
+function renderBar(){
+  const bar=$('#rbar'); if(!bar) return;
+  const d=openChatId&&replyDraft[openChatId];
+  if(!d){ bar.innerHTML=''; return }
+  const f=friend(openChatId), c=f&&charById(f.charId);
+  bar.innerHTML=`<div class="rt"><b>${esc(c?c.name:'')}に返信</b><span>${esc(d.text)}</span></div><button type="button" class="rx" data-reply-cancel="1" aria-label="返信をやめる">${IC.close}</button>`;
+}
 function blobToB64(blob){return new Promise((ok,ng)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]||'');r.onerror=ng;r.readAsDataURL(blob)})}
 async function resizeImage(file,maxEdge=1024,quality=.8){
   const url=URL.createObjectURL(file);
@@ -565,7 +594,7 @@ async function requestEngine(f,history,options={}){
     userName:S.me.name,userGender:S.me.gender,
     initialGreeting:options.initialGreeting===true,
     mode:options.mode||'reply',baseline:options.baseline===true,
-    history:history.filter(m=>m.from==='me'||m.from==='ai').slice(-24).map(m=>({from:m.from,text:m.img?'（写真を送った）'+(m.text===PIC_LABEL?'':'\n'+m.text):m.text})),
+    history:history.filter(m=>m.from==='me'||m.from==='ai').slice(-24).map(m=>({from:m.from,text:wireText(m)})),
     images:options.mode==='nudge'||options.initialGreeting===true?[]:await trailingImages(history),
     engineState:actorState(f.id),profile:ensureEngine().profile||null,
     engineSettings:{flags:e.settings.flags,styleNote:e.settings.styleNote}
@@ -619,6 +648,7 @@ const pendingTimers = {}, quietReadTimers = {};
 let openChatId = null, tab = 'home';
 
 function pushMsg(fid, m){
+  if(!m.id) m.id = Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   (S.msgs[fid] ||= []).push(m);
   const f = friend(fid);
   if(m.from==='ai' && f && openChatId!==fid){ f.unread=(f.unread||0)+1; banner(f,m.img?'📷 写真':m.text) }
@@ -719,7 +749,11 @@ function sendMsg(fid,text,img){
   const prev=(S.msgs[fid]||[]).filter(m=>m.from==='me'||m.from==='ai');
   const last=prev.length?prev[prev.length-1].ts:0;
   const previousUserAt=prev.filter(m=>m.from==='me').slice(-1)[0]?.ts||0;
-  pushMsg(fid,img?{from:'me',text:text||PIC_LABEL,img,ts:Date.now(),read:false}:{from:'me',text,ts:Date.now(),read:false});
+  const re=replyDraft[fid]?{id:replyDraft[fid].id,text:replyDraft[fid].text}:null;
+  if(re){delete replyDraft[fid];renderBar()}
+  const msg=img?{from:'me',text:text||PIC_LABEL,img,ts:Date.now(),read:false}:{from:'me',text,ts:Date.now(),read:false};
+  if(re)msg.re=re;
+  pushMsg(fid,msg);
   if(!greetBusy[fid])planResponse(fid,{lastInteractionAt:last,previousUserAt});
 }
 async function deliverPending(fid,plan){
@@ -770,6 +804,7 @@ function addFriend(charId, meet){
   const id = charId;
   S.friends = S.friends.filter(f=>f.id!==id);
   S.friends.push({id, charId, meet, aff:MEETS[meet].start, addedAt:Date.now(), unread:0});
+  delete replyDraft[id];
   S.msgs[id] = [{from:'sys', text:`${MEETS[meet].icon} ${MEETS[meet].label}で出会った`, ts:Date.now()}];
   cancelAllScheduled(id);
   delete ensureEngine().outages[id];
@@ -921,10 +956,10 @@ function openChat(fid){
   $('#chat').innerHTML = `<div class="lhd"><button class="ib" data-act="close-chat" aria-label="戻る">${IC.back}</button>
     <div class="ttl">${esc(c.name)}<small id="c-sub"></small></div>
     <button class="ib" data-act="profile" data-id="${fid}" aria-label="プロフィール">${IC.menu}</button></div>
-    <div id="msgs"></div>
+    <div id="msgs"></div><div id="rbar"></div>
     <form class="cin" id="cin"><button type="button" class="att" id="attb" aria-label="写真を送る">${IC.img}</button><input type="file" id="pick" accept="image/*" hidden><textarea id="inp" rows="1" placeholder="メッセージを入力" aria-label="メッセージ"></textarea><button class="send" id="sendb" aria-label="送信">${IC.send}</button></form>`;
   $('#chat').classList.add('open'); $('#profile').classList.remove('open');
-  renderMsgs(true); refresh();
+  selMsgId=null; renderMsgs(true); renderBar(); refresh();
   const inp = $('#inp');
   inp.oninput = ()=>{ inp.style.height='auto'; inp.style.height=inp.scrollHeight+'px'; $('#sendb').classList.toggle('on', !!inp.value.trim()) };
   inp.onkeydown = e=>{ if(e.key==='Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); $('#cin').requestSubmit() } };
@@ -947,22 +982,29 @@ function openChat(fid){
 function closeChat(){ openChatId=null; $('#chat').classList.remove('open'); refresh() }
 
 function bubble(m){
-  if(!m.img||!/^https:\/\//.test(m.img)) return `<div class="b">${esc(m.text)}</div>`;
-  const cap = m.text && m.text!==PIC_LABEL ? `<div class="cap">${esc(m.text)}</div>` : '';
-  return `<div class="b pic"><img src="${esc(m.img)}" alt="写真" loading="lazy" data-zoom="1">${cap}</div>`;
+  let b;
+  if(!m.img||!/^https:\/\//.test(m.img)) b=`<div class="b">${esc(m.text)}</div>`;
+  else{
+    const cap = m.text && m.text!==PIC_LABEL ? `<div class="cap">${esc(m.text)}</div>` : '';
+    b=`<div class="b pic"><img src="${esc(m.img)}" alt="写真" loading="lazy" data-zoom="1">${cap}</div>`;
+  }
+  if(m.re&&m.re.text) return `<div class="bx"><div class="rq" data-qid="${esc(m.re.id||'')}">${esc(String(m.re.text).slice(0,50))}</div>${b}</div>`;
+  return b;
 }
 function renderMsgs(force){
   const fid = openChatId, f = friend(fid); if(!f) return;
   const c = charById(f.charId), box = $('#msgs');
   const near = force || box.scrollHeight - box.scrollTop - box.clientHeight < 140;
   let html='', lastDay='', prev=null;
+  let idx=-1;
   for(const m of S.msgs[fid]||[]){
+    idx++;
     const d = dayLabel(m.ts);
     if(d!==lastDay){ html+=`<div class="dsep"><span>${d}</span></div>`; lastDay=d; prev=null }
     if(m.from==='sys'){ html+=`<div class="sys ${m.text.includes('親密度')?'up':''}">${esc(m.text.replace(/^\S+\s/,''))}</div>`; prev=null; continue }
     const first = prev!==m.from;
-    if(m.from==='me') html+=`<div class="m me ${first?'first':''}"><div class="meta">${m.read?'<span>既読</span>':''}<span>${hhmm(m.ts)}</span></div>${bubble(m)}</div>`;
-    else html+=`<div class="m ai ${first?'first':''}"><div class="aw">${first?av(c,36):''}</div><div class="col">${first?`<div class="nm">${esc(c.name)}</div>`:''}<div class="bw">${bubble(m)}<div class="meta">${hhmm(m.ts)}</div></div></div></div>`;
+    if(m.from==='me') html+=`<div class="m me ${first?'first':''}" data-mid="${esc(m.id||'')}"><div class="meta">${m.read?'<span>既読</span>':''}<span>${hhmm(m.ts)}</span></div>${bubble(m)}</div>`;
+    else html+=`<div class="m ai ${first?'first':''}" data-mid="${esc(m.id||'')}" data-idx="${idx}"><div class="aw">${first?av(c,36):''}</div><div class="col">${first?`<div class="nm">${esc(c.name)}</div>`:''}<div class="bw">${bubble(m)}<div class="meta">${hhmm(m.ts)}</div>${selMsgId&&m.id===selMsgId?'<button type="button" class="rp" data-reply-go="1">返信</button>':''}</div></div></div>`;
     prev = m.from;
   }
   if(typing[fid]){ const first = prev!=='ai'; html+=`<div class="m ai typing ${first?'first':''}"><div class="aw">${first?av(c,36):''}</div><div class="col"><div class="b"><i></i><i></i><i></i></div></div></div>` }
@@ -1036,6 +1078,22 @@ function applyMode(){
 /* ---------- EVENTS ---------- */
 document.addEventListener('click', e=>{
   const z = e.target.closest('img[data-zoom]'); if(z){ openLightbox(z.src); return }
+  if(e.target.closest('[data-reply-cancel]')){ delete replyDraft[openChatId]; renderBar(); return }
+  const go = e.target.closest('[data-reply-go]');
+  if(go){
+    const msgs=S.msgs[openChatId]||[], row=go.closest('.m'), m=msgs[+row.dataset.idx];
+    if(m){ replyDraft[openChatId]={id:m.id,text:snippet(m)}; selMsgId=null; renderMsgs(); renderBar(); const i=$('#inp'); if(i) i.focus() }
+    return;
+  }
+  const q = e.target.closest('.rq[data-qid]');
+  if(q){ const t=q.dataset.qid&&$('#msgs').querySelector('.m[data-mid="'+CSS.escape(q.dataset.qid)+'"]'); if(t){ t.scrollIntoView({block:'center',behavior:'smooth'}); t.classList.add('hl'); setTimeout(()=>t.classList.remove('hl'),1300) } return }
+  const row = e.target.closest('#msgs .m.ai[data-idx]');
+  if(row && e.target.closest('.b')){
+    const m=(S.msgs[openChatId]||[])[+row.dataset.idx];
+    if(m){ if(!m.id){ m.id=Date.now().toString(36)+Math.random().toString(36).slice(2,6); save() } selMsgId=selMsgId===m.id?null:m.id; renderMsgs(); }
+    return;
+  }
+  if(selMsgId && !e.target.closest('.rp')){ selMsgId=null; if(openChatId) renderMsgs() }
   const t = e.target.closest('[data-tab],[data-act],#banner'); if(!t) return;
   if(t.id==='banner'){ t.classList.remove('show'); closeAdd(); $('#profile').classList.remove('open'); openChat(t.dataset.id); return }
   if(t.dataset.tab){ tab=t.dataset.tab; refresh(); $('#tab').scrollTop=0; return }
