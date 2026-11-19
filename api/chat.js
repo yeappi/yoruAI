@@ -45,15 +45,18 @@ module.exports = async function handler(req, res) {
     const cast = CASTS[body.charId];
     const meet = MEETS[body.meet];
     const history = body.history;
-    if (!cast || !meet || !Array.isArray(history) || history.length < 1 ||
+    if (!cast || !meet || !Array.isArray(history) || (!body.initialGreeting && history.length < 1) ||
         history.length > 30) return res.status(400).json({error:'会話データが不正です'});
     const name = String(body.userName || 'あなた').slice(0,40).replace(/[\r\n]/g,' ');
     const gender = body.userGender === 'female' ? '女性' : '男性';
     const affinity = Math.max(0, Math.min(100, Number(body.affinity) || 0));
+    const initial = body.initialGreeting === true;
     const rows = history.filter(m => m && ['me','ai'].includes(m.from) &&
       typeof m.text === 'string' && m.text.trim()).slice(-24);
-    if (!rows.length || rows.some(m=>m.text.length > 1200)) return res.status(400).json({error:'メッセージが長すぎます'});
-    let contents = rows.map(m=>({role:m.from === 'me' ? 'user':'model',parts:[{text:m.text}]}));
+    if ((!initial && !rows.length) || rows.some(m=>m.text.length > 1200)) return res.status(400).json({error:'メッセージが長すぎます'});
+    let contents = initial
+      ? [{role:'user',parts:[{text:'（出会った直後に連絡先を交換した。相手からはまだ何も届いていない。）'}]}]
+      : rows.map(m=>({role:m.from === 'me' ? 'user':'model',parts:[{text:m.text}]}));
     // Gemini requires the history to begin with a user turn.
     if (contents[0].role !== 'user') contents.unshift({role:'user',parts:[{text:'（LINEを交換した）'}]});
     const system = [
@@ -62,10 +65,14 @@ module.exports = async function handler(req, res) {
       '性格・口調: ' + cast.tone.replaceAll('{name}', name),
       '相手: ' + name + '（' + gender + '）。出会い方: ' + meet,
       '現在の関係性の目安: 親密度 ' + affinity + '/100。会話の内容と関係性に合わせて距離感を調整する。',
-      '直近のやり取りを優先し、質問攻め・過度な共感・説明口調・箇条書きを避ける。',
+      '直近のやり取りを優先し、相手の言いたいことに直接反応する。質問攻め・過度な共感・説明口調・箇条書きを避ける。',
+      '毎回相手を褒めたり、決まった口癖や営業トークを繰り返したりしない。相手の発言の具体的な内容に反応する。',
+      'キャラの性格は発言の選び方・反応・口調に滲ませる。性格紹介の説明文を出力しない。',
+      '会話を続けるために毎回質問をする必要はない。短いリアクションやツッコミで終わってもよい。',
       '返答は自然な口語で、原則1〜2個の短い吹き出し。吹き出しを分けるなら空行で区切る。',
       '相手の冗談や皮肉は文脈で理解し、キャラクターらしい意見と個性を保つ。',
       '過去に話していない出来事を「覚えている」と言わない。架空の店を実在の予約先として扱わない。',
+      ...(initial ? ['これはあなたが最初に送るLINE。ユーザーはまだメッセージを送っていない。出会い方と性格を踏まえ、短く自然な第一声を1〜2吹き出しで書く。定型の自己紹介文や過度な褒め言葉は避ける。'] : []),
       'AIか直接聞かれたら、AIキャラクターであると正直に答える。',
       '会話文だけを返す。'
     ].join('\n');
