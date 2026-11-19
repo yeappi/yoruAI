@@ -8,8 +8,8 @@ test('five independent features',()=>{
  assert.deepEqual(Object.keys(E.DEFAULT_FLAGS),E.FEATURES);
  assert.ok(E.FEATURES.every(k=>E.DEFAULT_FLAGS[k]));
 });
-test('six distinct characters and persona context',()=>{
- assert.equal(Object.keys(E.CASTS).length,6);
+test('seven distinct characters and persona context',()=>{
+ assert.equal(Object.keys(E.CASTS).length,7);
  const ctx=E.build({charId:'mao',character:{name:'真央',job:'ガールズバー',store:'京橋',tone:'関西弁'},userName:'テスト',history:[]});
  assert.ok(ctx.system.includes('真央'));
  assert.ok(ctx.system.includes('関西弁'));
@@ -94,7 +94,7 @@ test('admin casts: DB rows add, override and remove casts; builtin defaults rest
   const st=E.initialState('hana',Date.now(),'match');
   assert.ok(st.mood.reason);
   E.setCasts([]);
-  assert.equal(Object.keys(E.CASTS).length,6);assert.equal(E.CASTS.hana,undefined);
+  assert.equal(Object.keys(E.CASTS).length,7);assert.equal(E.CASTS.hana,undefined);
 });
 
 test('user requests: detected, remembered across casts, enforced, and put at top of prompt',()=>{
@@ -124,4 +124,42 @@ test('user requests: detected, remembered across casts, enforced, and put at top
   const noMem=E.build({charId:'mao',character:E.CASTS.mao,meet:'x',userName:'a',userGender:'male',
     history:[{from:'me',text:'句読点つけないで'}],mode:'reply',settings:{flags:{memory:false}},state:null,profile:null});
   assert.ok(!/相手から頼まれた話し方/.test(noMem.system));
+});
+
+
+test('Yapi style cadence limits symbols per emitted bubbles and preserves real words',()=>{
+ let cadence=E.initialState('yapi').styleCadence;
+ const bubbles=[];
+ for(let i=0;i<60;i++){
+  const processed=E.enforceYapiStyle(['え笑笑、そうだね。'],cadence);
+  assert.equal(processed.messages.length,1);
+  bubbles.push(processed.messages[0]);
+  cadence=processed.styleCadence;
+ }
+ const punct=bubbles.flatMap((m,i)=>/[、。]/.test(m)?[i+1]:[]);
+ const laughs=bubbles.flatMap((m,i)=>/笑/.test(m)?[i+1]:[]);
+ assert.ok(punct.length<=4,'at most one punctuation bubble per 15');
+ assert.ok(laughs.length<=6,'at most one laughter bubble per 10');
+ for(let i=1;i<punct.length;i++)assert.ok(punct[i]-punct[i-1]>=15);
+ for(let i=1;i<laughs.length;i++)assert.ok(laughs[i]-laughs[i-1]>=10);
+ for(const m of bubbles)assert.ok((m.match(/[、。]/g)||[]).length<=1,'only one punctuation mark per bubble');
+ assert.equal(cadence.bubbles,60);
+ assert.deepEqual(E.enforceYapiStyle(['笑顔がいい','昨日笑った'],cadence).messages,['笑顔がいい','昨日笑った']);
+ const onlyLaughs=E.enforceYapiStyle(['笑笑','笑'],E.initialState('yapi').styleCadence);
+ assert.deepEqual(onlyLaughs.messages,['うん'],'never return empty messages');
+ assert.equal(onlyLaughs.styleCadence.bubbles,1);
+ assert.deepEqual(E.enforce(['そうだね、笑'],[]),['そうだね、笑'],'other casts remain unchanged');
+});
+
+test('Yapi can initiate closeness at low relationship without changing global rules',()=>{
+ const y=E.build({charId:'yapi',character:E.CASTS.yapi,history:[],settings:{flags:E.DEFAULT_FLAGS}});
+ assert.match(y.system,/電話しよ/);
+ assert.match(y.system,/まだ寝ないで/);
+ assert.match(y.system,/信頼は相談や弱さの共有/);
+ assert.match(y.system,/15吹き出しに1回以下/);
+ const other=E.build({charId:'ren',character:E.CASTS.ren,history:[],settings:{flags:E.DEFAULT_FLAGS}});
+ assert.ok(!other.system.includes('15吹き出しに1回以下'));
+ assert.ok(!other.system.includes('信頼は相談や弱さの共有'));
+ const noPersona=E.build({charId:'yapi',character:E.CASTS.yapi,history:[],settings:{flags:{persona:false}}});
+ assert.ok(!noPersona.system.includes('信頼は相談や弱さの共有'));
 });
