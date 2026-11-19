@@ -18,6 +18,7 @@ create table if not exists public.casts (
 alter table public.casts enable row level security;
 drop policy if exists casts_read on public.casts;
 create policy casts_read on public.casts for select to authenticated using (true);
+grant select on public.casts to authenticated;  -- このプロジェクトは新しいテーブルに自動で権限が付かないため明示する
 
 create table if not exists public.admin_pushes (
   id uuid primary key default gen_random_uuid(),
@@ -36,6 +37,7 @@ drop policy if exists pushes_mark_own on public.admin_pushes;
 create policy pushes_mark_own on public.admin_pushes for update to authenticated
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 -- ユーザーが更新してよいのは既読時刻だけ（本文や宛先は書き換えられない）
+grant select on public.admin_pushes to authenticated;
 revoke update on public.admin_pushes from anon, authenticated;
 grant update (delivered_at) on public.admin_pushes to authenticated;
 
