@@ -18,6 +18,8 @@
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase Publishable Key |
 | `GEMINI_MODEL` (任意) | 未設定なら `gemini-3.8-flash` |
 
+混雑時（HTTP 503/502/504/500 またはモデルの応答タイムアウト）は、原則として3.8 Flashを短く再試行し、`gemini-3.5-flash-lite` → `gemini-3.1-flash-lite` へ切り替える。429（利用上限）は別のエラーとして表示し、固定セリフには戻さない。最後に応答したモデルは設定画面で確認可能。予備モデルが使われた場合は「（予備）」と表示される。
+
 ## Supabase Auth
 
 最初に既存セッションを読み、無ければユーザー名だけの登録画面を表示する。
