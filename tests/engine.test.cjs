@@ -156,9 +156,9 @@ test('Yapi can initiate closeness at low relationship without changing global ru
  assert.match(y.system,/電話しよ/);
  assert.match(y.system,/まだ寝ないで/);
  assert.match(y.system,/信頼は相談や弱さの共有/);
- assert.match(y.system,/15吹き出しに1回以下/);
+ assert.match(y.system,/15件に1回以下/);
  const other=E.build({charId:'ren',character:E.CASTS.ren,history:[],settings:{flags:E.DEFAULT_FLAGS}});
- assert.ok(!other.system.includes('15吹き出しに1回以下'));
+ assert.ok(!other.system.includes('15件に1回以下'));
  assert.ok(!other.system.includes('信頼は相談や弱さの共有'));
  const noPersona=E.build({charId:'yapi',character:E.CASTS.yapi,history:[],settings:{flags:{persona:false}}});
  assert.ok(!noPersona.system.includes('信頼は相談や弱さの共有'));
