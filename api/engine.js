@@ -51,7 +51,7 @@ function relevantMemories(memories,utterance){
   return {m,score:m.importance*2+Math.min(hits,12)+(m.at||0)/1e13};
  }).sort((a,b)=>b.score-a.score).slice(0,7).map(x=>x.m);
 }
-function build({charId,meet,userName,userGender,history,initialGreeting,mode,settings,state,now=Date.now()}){
+function build({charId,character,meet,userName,userGender,history,initialGreeting,mode,settings,state,now=Date.now()}){
  const flags=sanitizeFlags(settings?.flags),base=normalize(state,charId,now),c=CASTS[charId]||CASTS.mao;
  const last=history.filter(x=>x?.from==='me').slice(-1)[0]?.text||'';
  const system=[
@@ -59,7 +59,8 @@ function build({charId,meet,userName,userGender,history,initialGreeting,mode,set
  '直近の会話を優先。説明口調、質問攻め、過剰な共感、機械的な褒め言葉、同じ営業文を避ける。',
  'LINE風の自然な短文。冗談を汲む。毎回質問せず、短い反応や反論で終わってよい。',
  '名前: '+short(userName,30)+'、性別: '+(userGender==='female'?'女性':'男性')+'、出会い: '+short(meet,120),
- 'キャスト識別子: '+short(charId,30),
+ 'キャスト名: '+short(character?.name||charId,50)+'。職業: '+short(character?.job,50)+'。架空の店: '+short(character?.store,80),
+ '基本の話し方: '+short(character?.tone,250),
  'AIか直接聞かれたら正直に答える。現実の会う約束や実在する店の予約を装わない。'
  ];
  if(flags.persona){
