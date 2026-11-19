@@ -1,9 +1,9 @@
-// 開発者画面のAPI。全ユーザーの会話が読めるので、合言葉（ADMIN_PASSWORD）をサーバー側で必ず検証する。
-// 使う環境変数: ADMIN_PASSWORD / SUPABASE_SERVICE_ROLE_KEY / NEXT_PUBLIC_SUPABASE_URL / GEMINI_API_KEY
-const crypto=require('node:crypto');
+// 開発者画面のAPI。全ユーザーの会話が読める画面なので、合言葉は必ず検証される。
+// 合言葉の検証と全ユーザーデータへのアクセスは、Supabase側の関数 admin_call（supabase/admin.sql）が行う。
+// このAPIはサービスキーを持たず、公開キー＋合言葉でその関数を呼ぶだけ。
+// 使う環境変数: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY / GEMINI_API_KEY
 const Engine=require('../lib/engine');
 const {reply}=require('../lib/reply');
-const {fetchRows}=require('../lib/castdb');
 
 const MEETS={
   first:'お店に初めて来たお客さんとしてLINEを交換した',
@@ -14,45 +14,35 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ID=/^[a-z0-9][a-z0-9_-]{1,23}$/;
 const ICON=/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
-// ---- 認証（失敗回数の制限つき。インスタンス単位の簡易的なもの）
+// ---- 失敗回数の制限（インスタンス単位。DB側にも全体のロックがある）
 const fails=new Map();
-const sha=s=>crypto.createHash('sha256').update(String(s)).digest();
-function authorized(req){
-  const given=req.headers['x-admin-password']||'';
-  const expected=process.env.ADMIN_PASSWORD||'';
-  if(!expected)return false;
-  return crypto.timingSafeEqual(sha(given),sha(expected));
-}
-function blocked(ip){
-  const f=fails.get(ip);
-  return !!f&&Date.now()-f.start<600000&&f.count>=8;
-}
+function blocked(ip){const f=fails.get(ip);return !!f&&Date.now()-f.start<600000&&f.count>=8}
 function fail(ip){
   const now=Date.now();
   let f=fails.get(ip);
-  if(!f||now-f.start>=600000){f={start:now,count:0};fails.set(ip,f);}
+  if(!f||now-f.start>=600000){f={start:now,count:0};fails.set(ip,f)}
   f.count++;
   if(fails.size>2000)fails.clear();
 }
 
-// ---- Supabase（service role）
-function sbConf(){
-  const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if(!url||!key)return null;
-  return {url:url.replace(/\/$/,''),key};
-}
-async function sb(path,{method='GET',body,prefer}={}){
-  const c=sbConf();
-  if(!c)throw Object.assign(new Error('SUPABASE_SERVICE_ROLE_KEY が未設定です'),{code:'NO_SERVICE_KEY'});
-  const res=await fetch(c.url+'/rest/v1/'+path,{method,
-    headers:{apikey:c.key,Authorization:'Bearer '+c.key,'Content-Type':'application/json',...(prefer?{Prefer:prefer}:{})},
-    body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(10000)});
+// ---- Supabase: admin_call（合言葉はDBで検証される）
+class AdminError extends Error{constructor(code,msg){super(msg||code);this.code=code}}
+async function rpc(pw,action,args={}){
+  const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if(!url||!key)throw new AdminError('NO_CONFIG','Supabaseの接続設定がありません');
+  const res=await fetch(url.replace(/\/$/,'')+'/rest/v1/rpc/admin_call',{method:'POST',
+    headers:{apikey:key,'Content-Type':'application/json'},
+    body:JSON.stringify({pw,action,args}),signal:AbortSignal.timeout(10000)});
   const text=await res.text();
-  let json=null;try{json=text?JSON.parse(text):null}catch{}
-  if(!res.ok)throw Object.assign(new Error(json?.message||('Supabase '+res.status)),{code:json?.code,status:res.status});
-  return json;
+  let j=null;try{j=text?JSON.parse(text):null}catch{}
+  if(res.status===404||j?.code==='PGRST202')throw new AdminError('NO_TABLE','必要なDB関数がありません。supabase/admin.sql を適用してください');
+  if(!res.ok)throw new AdminError('DB',j?.message||('Supabase '+res.status));
+  if(j&&!Array.isArray(j)&&j.error){
+    const m={AUTH:'合言葉が違います',LOCKED:'失敗が続いたため、しばらく待ってください',NOT_CONFIGURED:'合言葉がまだ登録されていません'};
+    throw new AdminError(j.error,m[j.error]||j.error);
+  }
+  return j;
 }
-const tableMissing=e=>e?.code==='PGRST205'||e?.code==='42P01'||/Could not find the table|does not exist/.test(e?.message||'');
 
 // ---- キャストの検証
 const str=(v,max)=>String(v??'').trim().slice(0,max);
@@ -78,23 +68,22 @@ function cleanCast(input,{needId=true}={}){
 const castView=c=>({id:c.id,name:c.name,kana:c.kana,job:c.job,store:c.store,catch:c.catch,status:c.status,
   tags:c.tags||[],tone:c.tone,values:c.values,want:c.want,style:c.style,life:c.life||[],examples:c.examples||[],icon:c.icon||''});
 
-async function refreshCasts(){
-  const c=sbConf();
-  if(!c){Engine.setCasts([]);return {rows:[],missing:false};}
+async function refreshCasts(pw){
   try{
-    const rows=await fetchRows({url:c.url,key:c.key,token:c.key});
+    const rows=await rpc(pw,'casts.list');
     Engine.setCasts(rows);
     return {rows,missing:false};
   }catch(e){
+    if(e.code==='AUTH'||e.code==='LOCKED')throw e;
     Engine.setCasts([]);
     return {rows:[],missing:true};
   }
 }
 
 // ---- ユーザーの状態から会話の材料を取り出す
-async function loadState(userId){
+async function loadState(pw,userId){
   if(!UUID.test(String(userId)))throw new Error('ユーザーIDが不正です');
-  const rows=await sb('app_states?select=user_id,updated_at,state&user_id=eq.'+userId);
+  const rows=await rpc(pw,'user.get',{id:userId});
   if(!rows?.length)throw new Error('ユーザーが見つかりません');
   return rows[0];
 }
@@ -114,23 +103,18 @@ module.exports=async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
   if(Number(req.headers['content-length']||0)>400000)return res.status(413).json({error:'Request too large'});
   const ip=String(req.headers['x-forwarded-for']||'').split(',')[0].trim()||'unknown';
-  if(!process.env.ADMIN_PASSWORD)return res.status(503).json({error:'ADMIN_PASSWORD が未設定です（Vercelの環境変数に追加してください）',code:'NO_ADMIN_PASSWORD'});
   if(blocked(ip))return res.status(429).json({error:'失敗が続いたため、10分ほど待ってください'});
-  if(!authorized(req)){fail(ip);return res.status(401).json({error:'合言葉が違います'});}
+  const pw=String(req.headers['x-admin-password']||'').slice(0,200);
   const body=typeof req.body==='string'?JSON.parse(req.body||'{}'):req.body||{};
   try{
+    const C=(a,args)=>rpc(pw,a,args);
     switch(body.action){
       case 'status':{
-        const hasKey=!!sbConf();
-        let castsTable=false,pushesTable=false;
-        if(hasKey){
-          castsTable=!(await sb('casts?select=id&limit=1').then(()=>null,e=>e));
-          pushesTable=!(await sb('admin_pushes?select=id&limit=1').then(()=>null,e=>e));
-        }
-        return res.json({ok:true,serviceKey:hasKey,gemini:!!process.env.GEMINI_API_KEY,castsTable,pushesTable});
+        await C('status');
+        return res.json({ok:true,serviceKey:true,gemini:!!process.env.GEMINI_API_KEY,castsTable:true,pushesTable:true});
       }
       case 'casts.list':{
-        const {rows,missing}=await refreshCasts();
+        const {rows,missing}=await refreshCasts(pw);
         const edited=new Set(rows.filter(r=>!r.deleted).map(r=>r.id));
         const removed=rows.filter(r=>r.deleted).map(r=>r.id);
         const builtin=new Set(Object.keys(Engine.PERSONAS));
@@ -139,31 +123,29 @@ module.exports=async function handler(req,res){
       }
       case 'casts.save':{
         const {id,data}=cleanCast(body.cast);
-        await sb('casts?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates',
-          body:{id,data,deleted:false,updated_at:new Date().toISOString()}});
+        await C('casts.save',{id,data});
         return res.json({ok:true,id});
       }
       case 'casts.delete':{
         const id=str(body.id,24);
         if(!ID.test(id))throw new Error('IDが不正です');
-        await sb('casts?on_conflict=id',{method:'POST',prefer:'resolution=merge-duplicates',
-          body:{id,data:{},deleted:true,updated_at:new Date().toISOString()}});
+        await C('casts.delete',{id});
         return res.json({ok:true});
       }
       case 'casts.reset':{ // 変更・削除を取り消して、組み込みの初期状態に戻す（独自に追加したAIは完全に消える）
         const id=str(body.id,24);
         if(!ID.test(id))throw new Error('IDが不正です');
-        await sb('casts?id=eq.'+encodeURIComponent(id),{method:'DELETE'});
+        await C('casts.reset',{id});
         return res.json({ok:true});
       }
       case 'users.list':{
-        const rows=await sb('app_states?select=user_id,updated_at,state&order=updated_at.desc&limit=200');
+        const rows=await C('users.list');
         return res.json({ok:true,users:(rows||[]).map(summarize)});
       }
       case 'convo':{
-        const row=await loadState(body.userId);
+        const row=await loadState(pw,body.userId);
         const s=row.state||{};
-        await refreshCasts();
+        await refreshCasts(pw);
         return res.json({ok:true,user:summarize(row),me:s.me||{},msgs:s.msgs||{},
           actors:s.engine?.actors||{},
           casts:Object.fromEntries(Object.values(Engine.CASTS).map(c=>[c.id,{name:c.name,icon:c.icon||''}]))});
@@ -185,8 +167,8 @@ module.exports=async function handler(req,res){
       }
       case 'push.draft':{ // そのユーザーの実際の会話をもとに、AIの言葉で連絡文を下書きする
         if(!process.env.GEMINI_API_KEY)return res.status(503).json({error:'GEMINI_API_KEY が未設定です'});
-        const row=await loadState(body.userId),s=row.state||{};
-        await refreshCasts();
+        const row=await loadState(pw,body.userId),s=row.state||{};
+        await refreshCasts(pw);
         const charId=str(body.charId,24);
         const cast=Object.hasOwn(Engine.CASTS,charId)?Engine.CASTS[charId]:null;
         const f=(s.friends||[]).find(x=>x.charId===charId);
@@ -206,24 +188,24 @@ module.exports=async function handler(req,res){
         if(!ID.test(charId)||!lines.length)throw new Error('AIと本文を入れてください');
         const at=body.deliverAt?new Date(body.deliverAt):new Date();
         if(Number.isNaN(at.getTime()))throw new Error('日時が不正です');
-        await sb('admin_pushes',{method:'POST',body:{user_id:body.userId,char_id:charId,text:lines.join('\n'),deliver_at:at.toISOString()}});
+        await C('push.create',{user_id:body.userId,char_id:charId,text:lines.join('\n'),deliver_at:at.toISOString()});
         return res.json({ok:true});
       }
       case 'push.list':{
-        const q=body.userId&&UUID.test(String(body.userId))?'&user_id=eq.'+body.userId:'';
-        const rows=await sb('admin_pushes?select=id,user_id,char_id,text,deliver_at,delivered_at&order=deliver_at.desc&limit=50'+q);
+        const rows=await C('push.list',{user_id:body.userId&&UUID.test(String(body.userId))?body.userId:null});
         return res.json({ok:true,pushes:rows||[]});
       }
       case 'push.cancel':{
         if(!UUID.test(String(body.id)))throw new Error('IDが不正です');
-        await sb('admin_pushes?id=eq.'+body.id+'&delivered_at=is.null',{method:'DELETE'});
+        await C('push.cancel',{id:body.id});
         return res.json({ok:true});
       }
       default:return res.status(400).json({error:'不明な操作です'});
     }
   }catch(e){
-    const msg=tableMissing(e)?'必要なテーブルがありません。supabase/admin.sql をSupabaseのSQL Editorで実行してください':String(e?.message||'エラー').slice(0,200);
+    if(e.code==='AUTH'){fail(ip);return res.status(401).json({error:e.message,code:'AUTH'})}
+    if(e.code==='LOCKED')return res.status(429).json({error:e.message,code:e.code});
     console.warn('admin error',body?.action,String(e?.message||'').slice(0,120));
-    return res.status(e?.code==='NO_SERVICE_KEY'?503:400).json({error:msg,code:tableMissing(e)?'NO_TABLE':e?.code});
+    return res.status(e instanceof AdminError?503:400).json({error:String(e?.message||'エラー').slice(0,200),code:e.code});
   }
 };
