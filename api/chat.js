@@ -1,4 +1,5 @@
-// One authenticated Gemini call per reply. The Gemini key never reaches the browser.
+// One authenticated Gemini call for reply and provisional state inference.
+const Engine=require('./engine');
 const CASTS = {
   kokoa: {name:'心愛',kana:'ここあ',job:'キャバ嬢',store:'北新地 Club LUNA',tone:'甘めのタメ口。語尾に「〜だよぉ」「♡」をよく使う。相手をたくさん褒める。寂しがり。たまにお店に誘う。'},
   rena: {name:'玲奈',kana:'れな',job:'ラウンジ',store:'北新地 Lounge 月白',tone:'丁寧語ベースのクールな大人の女性。感情は控えめだが、時々本音がこぼれる。'},
@@ -49,6 +50,14 @@ module.exports = async function handler(req, res) {
     if (!cast || !meet || !Array.isArray(history) || (!body.initialGreeting && history.length < 1) ||
         history.length > 30) return res.status(400).json({error:'会話データが不正です'});
     const name = String(body.userName || 'あなた').slice(0,40).replace(/[\r\n]/g,' ');
+    const mode=body.mode==='nudge'?'nudge':body.mode==='compare'?'compare':'reply';
+    const baseline=mode==='compare'&&body.baseline===true;
+    const requested=body.engineSettings||{};
+    const settings={flags:baseline?Object.fromEntries(Engine.FEATURES.map(k=>[k,false])):requested.flags,
+      styleNote:baseline?'':String(requested.styleNote||'').slice(0,350)};
+    const context=Engine.build({charId:body.charId,meet:MEETS[body.meet],userName:name,
+      userGender:body.userGender,history,initialGreeting:body.initialGreeting===true,
+      mode,settings,state:body.engineState});
     const gender = body.userGender === 'female' ? '女性' : '男性';
     const affinity = Math.max(0, Math.min(100, Number(body.affinity) || 0));
     const initial = body.initialGreeting === true;
@@ -60,23 +69,7 @@ module.exports = async function handler(req, res) {
       : rows.map(m=>({role:m.from === 'me' ? 'user':'model',parts:[{text:m.text}]}));
     // Gemini requires the history to begin with a user turn.
     if (contents[0].role !== 'user') contents.unshift({role:'user',parts:[{text:'（LINEを交換した）'}]});
-    const system = [
-      'あなたは日本語の架空の夜職キャラクターとして、LINEで自然に雑談する。',
-      '人物名: ' + cast.name + '（' + cast.kana + '）。職業: ' + cast.job + '。架空の店名: ' + cast.store,
-      '性格・口調: ' + cast.tone.replaceAll('{name}', name),
-      '相手: ' + name + '（' + gender + '）。出会い方: ' + meet,
-      '現在の関係性の目安: 親密度 ' + affinity + '/100。会話の内容と関係性に合わせて距離感を調整する。',
-      '直近のやり取りを優先し、相手の言いたいことに直接反応する。質問攻め・過度な共感・説明口調・箇条書きを避ける。',
-      '毎回相手を褒めたり、決まった口癖や営業トークを繰り返したりしない。相手の発言の具体的な内容に反応する。',
-      'キャラの性格は発言の選び方・反応・口調に滲ませる。性格紹介の説明文を出力しない。',
-      '会話を続けるために毎回質問をする必要はない。短いリアクションやツッコミで終わってもよい。',
-      '返答は自然な口語で、原則1〜2個の短い吹き出し。吹き出しを分けるなら空行で区切る。',
-      '相手の冗談や皮肉は文脈で理解し、キャラクターらしい意見と個性を保つ。',
-      '過去に話していない出来事を「覚えている」と言わない。架空の店を実在の予約先として扱わない。',
-      ...(initial ? ['これはあなたが最初に送るLINE。ユーザーはまだメッセージを送っていない。出会い方と性格を踏まえ、短く自然な第一声を1〜2吹き出しで書く。定型の自己紹介文や過度な褒め言葉は避ける。'] : []),
-      'AIか直接聞かれたら、AIキャラクターであると正直に答える。',
-      '会話文だけを返す。'
-    ].join('\n');
+    const system=context.system;
     // Primary Flash model first. On temporary server overload, retry briefly,
     // then try alternative free-tier models without changing the conversation.
     const primary = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
@@ -93,7 +86,7 @@ module.exports = async function handler(req, res) {
       if (model === primary && attempt === 2) {
         await new Promise(resolve=>setTimeout(resolve,650 + Math.floor(Math.random()*350)));
       }
-      const generationConfig = {temperature:0.9,maxOutputTokens:2048};
+      const generationConfig = {temperature:0.85,maxOutputTokens:2048,responseMimeType:'application/json'};
       if (model === 'gemini-3.8-flash') generationConfig.thinkingConfig={thinkingLevel:'low'};
       let reply;
       try {
@@ -140,9 +133,17 @@ module.exports = async function handler(req, res) {
       if (!output) {
         return res.status(502).json({error:'Geminiから返信が返りませんでした',model});
       }
-      const messages=output.split(/\n\s*\n/).map(text=>text.trim()).filter(Boolean).slice(0,3);
-      console.info('Gemini reply',model,model===primary?'primary':'fallback');
-      return res.status(200).json({messages,model,fallback:model!==primary});
+      let result;
+      try {result=Engine.parse(output);}
+      catch(e) {console.warn('Gemini parse failed',model,e.message);return res.status(502).json({error:'返信形式を解析できませんでした'});}
+      const userText=rows.filter(x=>x.from==='me').slice(-1)[0]?.text||'';
+      const nextState=mode==='compare'?context.state:
+        Engine.advance(context.state,result,{charId:body.charId,now:Date.now(),
+          userText,flags:context.flags,mode:body.initialGreeting?'greeting':mode});
+      console.info('Gemini reply',model,Engine.VERSION,model===primary?'primary':'fallback');
+      return res.status(200).json({messages:result.messages,model,fallback:model!==primary,
+        engineVersion:Engine.VERSION,engineState:nextState,
+        metadata:{structured:result.structured,features:context.flags,mode}});
     }
     console.error('Gemini models unavailable',lastFailure);
     return res.status(503).json({
