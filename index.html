@@ -207,6 +207,32 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
 #auth-gate input{display:block;width:100%;padding:12px;margin:9px 0;border:1px solid #ddd;border-radius:9px;font-size:16px;box-sizing:border-box}
 #auth-gate button{width:100%;padding:12px;border:none;border-radius:10px;background:#d95172;color:#fff;font-weight:700;margin:5px 0}
 #auth-gate small{color:#666;display:block;font-size:12px;margin:9px 0}
+
+/* 会話ラボ。既存のホーム・トークUIと切り離す。 */
+#lab{z-index:30;background:var(--group)}
+#lab .lhd{background:var(--bg)}
+.lab-body{flex:1;overflow-y:auto;padding:16px 16px max(28px,env(safe-area-inset-bottom));overscroll-behavior:contain}
+.lab-panel{background:var(--bg);border-radius:12px;margin-bottom:16px;padding:15px}
+.lab-panel h3{font-size:15px;margin:0 0 10px;font-weight:700}
+.lab-panel p{font-size:12px;color:var(--sub);line-height:1.6;margin:5px 0}
+.lab-row{display:flex;align-items:center;gap:12px;padding:8px 0}
+.lab-row+.lab-row{border-top:1px solid var(--hair)}
+.lab-label{flex:1;font-size:14px}
+.lab-switch{min-width:45px;border-radius:12px;background:var(--fill);padding:5px 10px;font-size:12px;color:var(--sub)}
+.lab-switch.on{background:var(--accent);color:#fff}
+.lab-entry{display:block;width:100%;background:var(--fill);border:0;border-radius:8px;padding:11px 12px;font-size:14px;color:var(--text);outline:0;box-sizing:border-box;resize:vertical}
+.lab-small{padding:7px 10px;background:var(--fill);border-radius:8px;font-size:12px;color:var(--text)}
+.lab-primary{background:var(--accent);color:#fff;border-radius:10px;min-height:40px;padding:8px 14px;font-size:14px;font-weight:600}
+.lab-primary:disabled{opacity:.45}
+.lab-choice{border:1px solid var(--hair);background:var(--bg);border-radius:9px;padding:10px;margin-top:8px}
+.lab-choice b{display:block;font-size:12px;margin-bottom:6px}
+.lab-choice p{font-size:14px;color:var(--text);white-space:pre-wrap}
+.lab-score{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:13px;gap:10px}
+.lab-bar{width:110px;height:5px;border-radius:3px;background:var(--fill);overflow:hidden}
+.lab-bar>i{display:block;height:100%;background:var(--accent)}
+.lab-trace{border-top:1px solid var(--hair);padding:10px 0;font-size:12px}
+.lab-trace small{color:var(--sub)}
+.lab-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 </style>
 </head>
 <body>
@@ -216,11 +242,13 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
   <section id="chat" class="layer"></section>
   <section id="profile" class="layer up"></section>
   <section id="add" class="layer up"></section>
+  <section id="lab" class="layer up"></section>
   <button id="banner"></button>
   <div id="toast" role="status"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.js"></script>
+<script src="/lab-ui.js"></script>
 <script>
 /* =========================================================
    yoruAI — プロトタイプ（1ファイル）
@@ -736,9 +764,15 @@ function setView(){
   <div class="grp"><div class="cell"><label>返信エンジン</label><span>${Backend.lastModel?esc(Backend.lastModel)+(Backend.usedFallback?'（予備）':''):'Gemini（サーバー接続）'}</span></div>
   <div class="cell"><label>クラウド保存</label><span>${Backend.ready?'接続済み':'接続待ち'}</span></div></div>
   <p class="foot">固定返信は停止しています。返答はGeminiが生成します。APIキーはサーバー側で管理します。</p>
+  <div class="sec"><b>開発・改善</b></div>
+  <div class="grp"><button class="cell" style="width:100%;text-align:left" data-act="open-lab">
+    <span style="font-size:15px;flex:1">会話ラボ</span>
+    <span style="color:var(--sub);font-size:13px">設定・比較・評価 ›</span>
+  </button></div>
+  <p class="foot">人格・関係性・気分・記憶・自発性を切り替え、同じ入力でA/B比較できます。</p>
   <div class="sec"><b>データ</b></div>
   <div class="grp"><button class="danger" data-act="reset">友だちとトークをすべて削除</button></div>
-  <p class="foot" style="padding-bottom:28px">yoruAI 0.6</p></div>`;
+  <p class="foot" style="padding-bottom:28px">yoruAI 0.7</p></div>`;
 }
 
 /* --- トークルーム --- */
@@ -848,6 +882,12 @@ document.addEventListener('click', e=>{
   if(t.dataset.tab){ tab=t.dataset.tab; refresh(); $('#tab').scrollTop=0; return }
   const id = t.dataset.id;
   switch(t.dataset.act){
+    case 'open-lab': LabUI.open(); break;
+    case 'close-lab': LabUI.close(); break;
+    case 'lab-toggle': LabUI.toggle(id); break;
+    case 'lab-forget': LabUI.forget(id); break;
+    case 'lab-vote': LabUI.vote(id); break;
+    case 'lab-rate': LabUI.rate(id,Number(t.dataset.score)); break;
     case 'add': openAdd(id); break;
     case 'close-add': closeAdd(); break;
     case 'meet': addSel.meet=id; updAdd(); break;
