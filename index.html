@@ -342,7 +342,7 @@ const charById = id => CHARS.find(c=>c.id===id);
 /* ---------- 2. STORE ---------- */
 const KEY = 'yoruai.v1';
 const GENDERS = {male:'男性', female:'女性'};
-const DEFAULT = {me:{name:'あなた', status:'', gender:'male'}, mode:'light', ai:{provider:'gemini', key:'', model:'gemini-2.5-flash'}, friends:[], msgs:{}};
+const DEFAULT = {me:{name:'あなた', status:'', gender:'male'}, mode:'light', ai:{provider:'gemini', key:'', model:'gemini-3.8-flash'}, friends:[], msgs:{}};
 let S = load();
 function load(){try{
   const d=structuredClone(DEFAULT),j=JSON.parse(localStorage.getItem(KEY))||{},o=Object.assign(d,j);
