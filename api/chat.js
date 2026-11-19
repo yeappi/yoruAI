@@ -69,8 +69,10 @@ module.exports = async function handler(req, res) {
       'AIか直接聞かれたら、AIキャラクターであると正直に答える。',
       '会話文だけを返す。'
     ].join('\n');
-    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
     if (!/^gemini-[a-z0-9.-]+$/.test(model)) return res.status(503).json({error:'モデル設定が不正です'});
+    const generationConfig={temperature:0.9,maxOutputTokens:2048};
+    if (model==='gemini-3.8-flash') generationConfig.thinkingConfig={thinkingLevel:'low'};
     const reply = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' +
       encodeURIComponent(model) + ':generateContent', {
       method:'POST',
@@ -78,7 +80,7 @@ module.exports = async function handler(req, res) {
       body:JSON.stringify({
         systemInstruction:{parts:[{text:system}]},
         contents,
-        generationConfig:{temperature:0.9,maxOutputTokens:450}
+        generationConfig
       }),
       signal:AbortSignal.timeout(35000)
     });
