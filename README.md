@@ -4,7 +4,7 @@
 
 ## 構成
 
-- `index.html`: 友だち追加・出会い方・トーク画面。Supabase Auth、クラウド同期のクライアント処理
+- `index.html`: 友だち追加・出会い方・トーク画面。Supabase Auth、クラウド同期のクライアント処理。固定返信モードは廃止し、初回挨拶もGeminiで生成
 - `api/config.js`: 公開してよいSupabase URL / Publishable Keyをブラウザへ渡す
 - `api/chat.js`: Supabase Authトークンを検証し、Gemini APIでキャスト返信を生成する
 - Supabase `public.app_states`: 各ユーザーの現在の画面状態とトーク履歴をJSONBで保存（RLS有効）
