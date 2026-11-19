@@ -772,19 +772,23 @@ async function startGreeting(fid,addedAt){
     const parts=await generateReply(f,[],true);
     if(friend(fid)?.addedAt!==addedAt)return;
     if((S.msgs[fid]||[]).some(m=>m.from==='me'))return;
-    for(const text of parts){
-      pushMsg(fid,{from:'ai',text,ts:Date.now()});
+    for(let i=0;i<parts.length;i++){
+      if(i)await wait(170+Math.min(800,parts[i].length*22));
+      if(friend(fid)?.addedAt!==addedAt)return;
+      if((S.msgs[fid]||[]).some(m=>m.from==='me'))return;
+      pushMsg(fid,{from:'ai',text:parts[i],ts:Date.now()});
     }
   }catch(e){
-    console.error('Greeting generation failed',e);
-    if(friend(fid)?.addedAt===addedAt)pushMsg(fid,{
-      from:'sys',text:'⚠️ 最初のAIメッセージ生成エラー: '+String(e.message||e).slice(0,100),ts:Date.now()
-    });
+    if(friend(fid)?.addedAt===addedAt)noteModelOutage(fid,e);
   }finally{
     typing[fid]=false;
     delete greetBusy[fid];
     refresh();
-    if(friend(fid)?.addedAt===addedAt&&(S.msgs[fid]||[]).some(m=>m.from==='me'))respond(fid);
+    if(friend(fid)?.addedAt===addedAt&&(S.msgs[fid]||[]).some(m=>m.from==='me')){
+      const ms=(S.msgs[fid]||[]).filter(m=>m.from==='me');
+      planResponse(fid,{previousUserAt:ms.length>1?ms[ms.length-2].ts:0,
+        lastInteractionAt:ms.length>1?ms[ms.length-2].ts:0});
+    }
   }
 }
 
