@@ -16,6 +16,7 @@ const MEETS = {
 // A warm instance throttle is only a trial-level safeguard, not a distributed quota.
 const throttle = new Map();
 let primaryOverloadedUntil = 0;
+const quotaBackoffUntil = new Map();
 
 module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -82,20 +83,19 @@ module.exports = async function handler(req, res) {
     const system=context.system;
     // Primary Flash model first. On temporary server overload, retry briefly,
     // then try alternative free-tier models without changing the conversation.
-    const primary = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+    const primary = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
     if (!/^gemini-[a-z0-9.-]+$/.test(primary)) {
       return res.status(503).json({error:'モデル設定が不正です'});
     }
-    const fallbackModels = ['gemini-3.5-flash-lite','gemini-3.1-flash-lite']
+    const fallbackModels = ['gemini-3.1-flash-lite','gemini-3.5-flash-lite']
       .filter(m => m !== primary);
-    const attempts = Date.now() < primaryOverloadedUntil
-      ? fallbackModels.map(model=>({model,attempt:1}))
-      : [{model:primary,attempt:1},{model:primary,attempt:2},...fallbackModels.map(model=>({model,attempt:1}))];
+    const available = model => Date.now() >= (quotaBackoffUntil.get(model) || 0);
+    const attempts = [
+      ...(Date.now() < primaryOverloadedUntil ? [] : [{model:primary,attempt:1}]),
+      ...fallbackModels.map(model=>({model,attempt:1}))
+    ].filter(({model}) => available(model));
     let lastFailure = null;
     for (const {model,attempt} of attempts) {
-      if (model === primary && attempt === 2) {
-        await new Promise(resolve=>setTimeout(resolve,650 + Math.floor(Math.random()*350)));
-      }
       const generationConfig = {temperature:0.85,maxOutputTokens:2048,responseMimeType:'application/json'};
       if (model === 'gemini-3.8-flash') generationConfig.thinkingConfig={thinkingLevel:'low'};
       let reply;
@@ -126,7 +126,7 @@ module.exports = async function handler(req, res) {
         console.warn('Gemini failure',model,attempt,reply.status,details);
         lastFailure={model,status:reply.status};
         if ([500,502,503,504].includes(reply.status)) {
-          if (model === primary && attempt === 2) primaryOverloadedUntil=Date.now()+30000;
+          if (model === primary) primaryOverloadedUntil=Date.now()+30000;
           continue;
         }
         // If a fallback model is unavailable or forbidden for this API project,
@@ -134,7 +134,10 @@ module.exports = async function handler(req, res) {
         // remain explicit rather than being disguised as capacity issues.
         if (model !== primary && [403,404].includes(reply.status)) continue;
         if (reply.status === 429) {
-          return res.status(429).json({error:'Geminiの利用上限に達しました。時間をおいてから再送してください。',model});
+          // Quota limits can differ by model. Try the remaining models once,
+          // without repeatedly probing a model that has just returned 429.
+          quotaBackoffUntil.set(model,Date.now()+10*60*1000);
+          continue;
         }
         return res.status(502).json({error:'Gemini API エラー ('+reply.status+'): '+details,model});
       }
@@ -158,9 +161,10 @@ module.exports = async function handler(req, res) {
         metadata:{structured:result.structured,features:context.flags,mode}});
     }
     console.error('Gemini models unavailable',lastFailure);
-    return res.status(503).json({
-      error:'Geminiが混雑しています。再試行と別モデルへの切り替えも失敗しました。少し時間をおいてから送信してください。',
-      code:'GEMINI_CAPACITY_UNAVAILABLE'
+    const exhausted=lastFailure?.status===429||attempts.length===0;
+    return res.status(exhausted?429:503).json({
+      error:exhausted?'現在のGeminiの利用枠に空きがありません。':'現在Geminiが混雑しています。',
+      code:exhausted?'GEMINI_QUOTA_UNAVAILABLE':'GEMINI_CAPACITY_UNAVAILABLE'
     });
   } catch(e) {
     console.error('Chat endpoint failed', e?.name || 'Error', String(e?.message||'').slice(0,160));
