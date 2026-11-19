@@ -64,9 +64,19 @@ module.exports = async function handler(req, res) {
     const rows = history.filter(m => m && ['me','ai'].includes(m.from) &&
       typeof m.text === 'string' && m.text.trim()).slice(-24);
     if ((!initial && !rows.length) || rows.some(m=>m.text.length > 1200)) return res.status(400).json({error:'メッセージが長すぎます'});
+    // Merge consecutive messages into one logical Gemini turn, preserving line breaks.
+    // One waiting batch generates one reply, not one reply per user bubble.
     let contents = initial
       ? [{role:'user',parts:[{text:'（出会った直後に連絡先を交換した。相手からはまだ何も届いていない。）'}]}]
-      : rows.map(m=>({role:m.from === 'me' ? 'user':'model',parts:[{text:m.text}]}));
+      : [];
+    if(!initial){
+      for(const m of rows){
+        const role=m.from==='me'?'user':'model';
+        const previous=contents[contents.length-1];
+        if(previous?.role===role)previous.parts[0].text+='\n'+m.text;
+        else contents.push({role,parts:[{text:m.text}]});
+      }
+    }
     // Gemini requires the history to begin with a user turn.
     if (contents[0].role !== 'user') contents.unshift({role:'user',parts:[{text:'（LINEを交換した）'}]});
     const system=context.system;
@@ -136,7 +146,9 @@ module.exports = async function handler(req, res) {
       let result;
       try {result=Engine.parse(output);}
       catch(e) {console.warn('Gemini parse failed',model,e.message);return res.status(502).json({error:'返信形式を解析できませんでした'});}
-      const userText=rows.filter(x=>x.from==='me').slice(-1)[0]?.text||'';
+      const lastUserBatch=[];
+      for(let i=rows.length-1;i>=0&&rows[i].from==='me';i--)lastUserBatch.unshift(rows[i].text);
+      const userText=lastUserBatch.join('\n');
       const nextState=mode==='compare'?context.state:
         Engine.advance(context.state,result,{charId:body.charId,now:Date.now(),
           userText,flags:context.flags,mode:body.initialGreeting?'greeting':mode});
