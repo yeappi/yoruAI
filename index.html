@@ -249,6 +249,7 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.js"></script>
 <script src="/lab-ui.js"></script>
+<script src="/reply-timing.js"></script>
 <script>
 /* =========================================================
    yoruAI — プロトタイプ（1ファイル）
@@ -398,6 +399,8 @@ function ensureEngine(){
   if(!e.actors||typeof e.actors!=='object')e.actors={};
   if(!Array.isArray(e.logs))e.logs=[];
   if(!Array.isArray(e.evaluations))e.evaluations=[];
+  if(!e.pendingReplies||typeof e.pendingReplies!=='object')e.pendingReplies={};
+  if(!e.outages||typeof e.outages!=='object')e.outages={};
   return e;
 }
 ensureEngine();
@@ -503,6 +506,7 @@ async function connectUser(userId){
     save();
     document.getElementById('auth-gate')?.classList.remove('show');
     applyMode();refresh();toast('クラウド接続完了');
+    resumePendingReplies();
     setTimeout(()=>maybeNudgeOnReturn(),1800);
   }catch(e){
     console.error('Supabase connection failed',e);
@@ -594,49 +598,156 @@ async function maybeNudgeOnReturn(){
 
 /* ---------- 4. CHAT FLOW ---------- */
 const wait = ms => new Promise(r=>setTimeout(r,ms));
-const busy = {}, typing = {}, greetBusy = {};
+const busy = {}, typing = {}, greetBusy = {}, replyLocks = {};
+const pendingTimers = {}, quietReadTimers = {};
 let openChatId = null, tab = 'home';
 
 function pushMsg(fid, m){
   (S.msgs[fid] ||= []).push(m);
   const f = friend(fid);
-  if(m.from==='ai' && openChatId!==fid){ f.unread=(f.unread||0)+1; banner(f, m.text) }
+  if(m.from==='ai' && f && openChatId!==fid){ f.unread=(f.unread||0)+1; banner(f,m.text) }
   save(); refresh();
 }
 
-function sendMsg(fid, text){
-  if(!Backend.ready){toast('接続を準備中です');return}
-  const f = friend(fid);
-  pushMsg(fid, {from:'me', text, ts:Date.now(), read:false});
-  // Relationship changes come from the interpreted conversation, not message count.
-  save();
-  if(!greetBusy[fid]) respond(fid);
+function readMessages(fid){
+  let changed=false;
+  for(const m of S.msgs[fid]||[]){
+    if(m.from==='me'&&!m.read){m.read=true;changed=true}
+  }
+  if(changed){save();refresh()}
 }
-
-async function respond(fid){
-  if(busy[fid]) return; busy[fid]=true;
-  let failed=false;
-  try{
-    await wait(500+Math.random()*1200);
-    (S.msgs[fid]||[]).forEach(m=>{ if(m.from==='me') m.read=true }); save(); refresh();
-    await wait(300);
-    typing[fid]=true; refresh();
-    const f = friend(fid); if(!f) return;
-    const parts = await generateReply(f, S.msgs[fid]);
-    for(let i=0;i<parts.length;i++){
-      if(i) { typing[fid]=true; refresh(); await wait(600+parts[i].length*25) }
-      typing[fid]=false;
-      pushMsg(fid, {from:'ai', text:parts[i], ts:Date.now()});
+function cancelPendingTimers(fid){
+  const t=pendingTimers[fid];
+  if(t){clearTimeout(t.read);clearTimeout(t.request);delete pendingTimers[fid]}
+}
+function cancelAllScheduled(fid){
+  cancelPendingTimers(fid);
+  if(quietReadTimers[fid]){clearTimeout(quietReadTimers[fid]);delete quietReadTimers[fid]}
+  delete ensureEngine().pendingReplies[fid];
+  busy[fid]=false;
+}
+function inCharacterBusy(charId){
+  const variants={
+    kokoa:['ごめんね🥲今ちょっとバタバタしてる','いま手が離せなくて💦あとで返すね'],
+    rena:['ごめんなさい、今少し立て込んでいて','今はちょっと手が離せません。また後で'],
+    yume:['ごめん！今わちゃわちゃしてるにゃ💦','ちょっと忙しい！またあとでね！'],
+    ren:['ごめん、今ちょっと手が離せない','今バタバタしてる！落ち着いたら返すね'],
+    nagi:['すみません、今少し取り込んでいて','少し手が離せません。また後ほど'],
+    mao:['ごめーーん、今めっちゃバタバタしてる笑','ちょい待って！今手が離されへん']
+  };
+  const lines=variants[charId]||variants.mao;
+  return lines[Math.floor(Math.random()*lines.length)];
+}
+function noteModelOutage(fid,error){
+  console.error('AI generation unavailable',fid,error);
+  const e=ensureEngine(),now=Date.now(),prior=e.outages[fid]||{};
+  const alreadyNotified=prior.active===true;
+  e.outages[fid]={active:true,since:prior.since||now,lastErrorAt:now,
+    retryAfter:now+90000,notified:alreadyNotified||false,
+    failures:Math.min(100,(prior.failures||0)+1)};
+  if(!alreadyNotified&&friend(fid)){
+    e.outages[fid].notified=true;
+    pushMsg(fid,{from:'ai',text:inCharacterBusy(friend(fid).charId),
+      serviceFallback:true,ts:now});
+  }
+  save();
+}
+function planResponse(fid,options={}){
+  if(!Backend.ready||!friend(fid)||greetBusy[fid])return;
+  if(replyLocks[fid])return; // A request already started. Pending new messages are handled after it.
+  const e=ensureEngine(),now=Date.now(),prior=e.outages[fid];
+  if(prior?.active&&now<(prior.retryAfter||0)){
+    clearTimeout(quietReadTimers[fid]);
+    quietReadTimers[fid]=setTimeout(()=>{delete quietReadTimers[fid];readMessages(fid)},10000);
+    return; // While unavailable, mark read without repeating the holding message.
+  }
+  const existing=e.pendingReplies[fid];
+  if(ReplyTiming.valid(existing)){
+    if(ReplyTiming.shouldExpedite({plan:existing,previousUserAt:options.previousUserAt,now})){
+      e.pendingReplies[fid]=ReplyTiming.expedite(existing,now);
+      save();
+      armPending(fid);
     }
-  } catch(e){
-    failed=true;
-    console.error('AI response error',e);
-    toast('AI返信エラー');
-    pushMsg(fid,{from:'sys',text:'⚠️ AI返信エラー: '+String(e.message||e).slice(0,140),ts:Date.now()});
-  } finally { typing[fid]=false; busy[fid]=false; refresh() }
-  const ms = S.msgs[fid]||[];
-  const lastAi = ms.map(m=>m.from).lastIndexOf('ai');
-  if(!failed && ms.slice(lastAi+1).some(m=>m.from==='me')) respond(fid); // 返信中に送られた分にも返す
+    return; // All consecutive messages are collected for ONE Gemini request.
+  }
+  const messages=S.msgs[fid]||[];
+  const firstResponse=!messages.some(m=>m.from==='ai'&&!m.serviceFallback);
+  const p=ReplyTiming.plan({now,firstResponse,lastInteractionAt:options.lastInteractionAt||0});
+  e.pendingReplies[fid]=p;
+  busy[fid]=true;
+  save();
+  armPending(fid);
+}
+function armPending(fid){
+  cancelPendingTimers(fid);
+  const p=ensureEngine().pendingReplies[fid];
+  if(!Backend.ready||!friend(fid)||!ReplyTiming.valid(p)||replyLocks[fid])return;
+  busy[fid]=true;
+  pendingTimers[fid]={
+    read:setTimeout(()=>{
+      if(ensureEngine().pendingReplies[fid]?.requestAt===p.requestAt)readMessages(fid);
+    },Math.max(0,p.readAt-Date.now())),
+    request:setTimeout(()=>deliverPending(fid,p),Math.max(0,p.requestAt-Date.now()))
+  };
+}
+function resumePendingReplies(){
+  const e=ensureEngine();
+  for(const [fid,p] of Object.entries(e.pendingReplies)){
+    if(!friend(fid)||!ReplyTiming.valid(p)){delete e.pendingReplies[fid];continue}
+    armPending(fid);
+  }
+  save();
+}
+function sendMsg(fid,text){
+  if(!Backend.ready){toast('接続を準備中です');return}
+  const prev=(S.msgs[fid]||[]).filter(m=>m.from==='me'||m.from==='ai');
+  const last=prev.length?prev[prev.length-1].ts:0;
+  const previousUserAt=prev.filter(m=>m.from==='me').slice(-1)[0]?.ts||0;
+  pushMsg(fid,{from:'me',text,ts:Date.now(),read:false});
+  if(!greetBusy[fid])planResponse(fid,{lastInteractionAt:last,previousUserAt});
+}
+async function deliverPending(fid,plan){
+  const e=ensureEngine();
+  if(e.pendingReplies[fid]?.requestAt!==plan.requestAt||replyLocks[fid])return;
+  cancelPendingTimers(fid);
+  delete e.pendingReplies[fid];
+  const f=friend(fid);
+  if(!f){busy[fid]=false;save();return}
+  const addedAt=f.addedAt;
+  replyLocks[fid]=true;
+  busy[fid]=true;
+  readMessages(fid);
+  typing[fid]=true;refresh();
+  const captured=(S.msgs[fid]||[]).slice();
+  const capturedUserCount=captured.filter(m=>m.from==='me').length;
+  let succeeded=false;
+  try{
+    // IMPORTANT: the API is called only AFTER the scheduled wait.
+    // Every message sent while waiting is passed as one conversation history.
+    const parts=await generateReply(f,captured);
+    if(friend(fid)?.addedAt!==addedAt)return;
+    if(e.outages[fid])delete e.outages[fid];
+    for(let i=0;i<parts.length;i++){
+      if(i){typing[fid]=true;refresh();await wait(200+Math.min(1200,parts[i].length*24))}
+      typing[fid]=false;
+      pushMsg(fid,{from:'ai',text:parts[i],ts:Date.now()});
+    }
+    succeeded=true;
+  }catch(error){
+    // API failures stay in dev logs, never visible in the chat transcript.
+    if(friend(fid)?.addedAt===addedAt)noteModelOutage(fid,error);
+  }finally{
+    typing[fid]=false;replyLocks[fid]=false;busy[fid]=false;
+    save();refresh();
+    if(succeeded&&friend(fid)?.addedAt===addedAt){
+      const currentCount=(S.msgs[fid]||[]).filter(m=>m.from==='me').length;
+      // New messages received WHILE Gemini was generating need a new combined response.
+      if(currentCount>capturedUserCount)planResponse(fid,{
+        lastInteractionAt:Date.now(),
+        previousUserAt:(S.msgs[fid]||[]).filter(m=>m.from==='me').slice(-2)[0]?.ts||0
+      });
+    }
+  }
 }
 
 function addFriend(charId, meet){
@@ -644,6 +755,8 @@ function addFriend(charId, meet){
   S.friends = S.friends.filter(f=>f.id!==id);
   S.friends.push({id, charId, meet, aff:MEETS[meet].start, addedAt:Date.now(), unread:0});
   S.msgs[id] = [{from:'sys', text:`${MEETS[meet].icon} ${MEETS[meet].label}で出会った`, ts:Date.now()}];
+  cancelAllScheduled(id);
+  delete ensureEngine().outages[id];
   ensureEngine().actors[id]=null;
   save();
   startGreeting(id,S.friends.find(f=>f.id===id).addedAt);
