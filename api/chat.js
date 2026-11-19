@@ -14,6 +14,7 @@ const MEETS = {
 };
 // A warm instance throttle is only a trial-level safeguard, not a distributed quota.
 const throttle = new Map();
+let primaryOverloadedUntil = 0;
 
 module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -76,32 +77,78 @@ module.exports = async function handler(req, res) {
       'AIか直接聞かれたら、AIキャラクターであると正直に答える。',
       '会話文だけを返す。'
     ].join('\n');
-    const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
-    if (!/^gemini-[a-z0-9.-]+$/.test(model)) return res.status(503).json({error:'モデル設定が不正です'});
-    const generationConfig={temperature:0.9,maxOutputTokens:2048};
-    if (model==='gemini-3.8-flash') generationConfig.thinkingConfig={thinkingLevel:'low'};
-    const reply = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' +
-      encodeURIComponent(model) + ':generateContent', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
-      body:JSON.stringify({
-        systemInstruction:{parts:[{text:system}]},
-        contents,
-        generationConfig
-      }),
-      signal:AbortSignal.timeout(35000)
-    });
-    if (!reply.ok) {
-      const error = await reply.json().catch(()=>({}));
-      const summary = String(error.error?.message || 'Google API error').slice(0,220);
-      console.error('Gemini request failed',reply.status,summary);
-      return res.status(502).json({error:'Gemini API エラー (' + reply.status + '): ' + summary});
+    // Primary Flash model first. On temporary server overload, retry briefly,
+    // then try alternative free-tier models without changing the conversation.
+    const primary = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+    if (!/^gemini-[a-z0-9.-]+$/.test(primary)) {
+      return res.status(503).json({error:'モデル設定が不正です'});
     }
-    const data = await reply.json();
-    const output = data.candidates?.[0]?.content?.parts?.map(x=>x.text||'').join('').trim();
-    if (!output) return res.status(502).json({error:'Geminiから返信が返りませんでした'});
-    const messages = output.split(/\n\s*\n/).map(s=>s.trim()).filter(Boolean).slice(0,3);
-    return res.status(200).json({messages,model});
+    const fallbackModels = ['gemini-3.5-flash-lite','gemini-3.1-flash-lite']
+      .filter(m => m !== primary);
+    const attempts = Date.now() < primaryOverloadedUntil
+      ? fallbackModels.map(model=>({model,attempt:1}))
+      : [{model:primary,attempt:1},{model:primary,attempt:2},...fallbackModels.map(model=>({model,attempt:1}))];
+    let lastFailure = null;
+    for (const {model,attempt} of attempts) {
+      if (model === primary && attempt === 2) {
+        await new Promise(resolve=>setTimeout(resolve,650 + Math.floor(Math.random()*350)));
+      }
+      const generationConfig = {temperature:0.9,maxOutputTokens:2048};
+      if (model === 'gemini-3.8-flash') generationConfig.thinkingConfig={thinkingLevel:'low'};
+      let reply;
+      try {
+        reply = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' +
+          encodeURIComponent(model) + ':generateContent', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','x-goog-api-key':apiKey},
+          body:JSON.stringify({
+            systemInstruction:{parts:[{text:system}]},
+            contents,
+            generationConfig
+          }),
+          signal:AbortSignal.timeout(12000)
+        });
+      } catch (e) {
+        const timeout = e?.name === 'TimeoutError' || e?.name === 'AbortError';
+        console.warn('Gemini transport error',model,attempt,timeout?'timeout':'network');
+        if (!timeout) {
+          return res.status(502).json({error:'Geminiとの通信に失敗しました。もう一度送信してください。'});
+        }
+        lastFailure={model,status:504};
+        continue;
+      }
+      if (!reply.ok) {
+        const errJson=await reply.json().catch(()=>({}));
+        const details=String(errJson.error?.message||'Google API error').slice(0,160);
+        console.warn('Gemini failure',model,attempt,reply.status,details);
+        lastFailure={model,status:reply.status};
+        if ([500,502,503,504].includes(reply.status)) {
+          if (model === primary && attempt === 2) primaryOverloadedUntil=Date.now()+30000;
+          continue;
+        }
+        // If a fallback model is unavailable or forbidden for this API project,
+        // try the next fallback. The original model's permission errors should
+        // remain explicit rather than being disguised as capacity issues.
+        if (model !== primary && [403,404].includes(reply.status)) continue;
+        if (reply.status === 429) {
+          return res.status(429).json({error:'Geminiの利用上限に達しました。時間をおいてから再送してください。',model});
+        }
+        return res.status(502).json({error:'Gemini API エラー ('+reply.status+'): '+details,model});
+      }
+      const data=await reply.json();
+      const output=data.candidates?.[0]?.content?.parts?.map(x=>x.text||'').join('').trim();
+      if (!output) {
+        return res.status(502).json({error:'Geminiから返信が返りませんでした',model});
+      }
+      const messages=output.split(/\n\s*\n/).map(text=>text.trim()).filter(Boolean).slice(0,3);
+      console.info('Gemini reply',model,model===primary?'primary':'fallback');
+      return res.status(200).json({messages,model,fallback:model!==primary});
+    }
+    console.error('Gemini models unavailable',lastFailure);
+    return res.status(503).json({
+      error:'Geminiが混雑しています。再試行と別モデルへの切り替えも失敗しました。少し時間をおいてから送信してください。',
+      code:'GEMINI_CAPACITY_UNAVAILABLE'
+    });
   } catch(e) {
     console.error('Chat endpoint failed', e?.name || 'Error', String(e?.message||'').slice(0,160));
     return res.status(502).json({error:'サーバーとの通信に失敗しました'});
