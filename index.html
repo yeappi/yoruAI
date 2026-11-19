@@ -355,7 +355,7 @@ function load(){try{
   if(!GENDERS[o.me.gender])o.me.gender='male';
   return o;
 }catch(e){return structuredClone(DEFAULT)} }
-const Backend={client:null,ready:false,userId:null,displayId:null,pendingName:null,hydrating:false,saveTimer:null,queue:Promise.resolve()};
+const Backend={client:null,ready:false,userId:null,displayId:null,pendingName:null,lastModel:null,usedFallback:false,hydrating:false,saveTimer:null,queue:Promise.resolve()};
 function cleanState(){const copy=structuredClone(S);copy.ai=Object.assign({},copy.ai,{key:'',provider:'gemini'});delete copy.ai.manualMock;return copy}
 function save(){
   S.ai.key='';
@@ -489,6 +489,8 @@ async function geminiReply(f,history,initialGreeting=false){
   const result=await res.json().catch(()=>({}));
   if(!res.ok)throw new Error(result.error||'HTTP '+res.status);
   if(!Array.isArray(result.messages)||!result.messages.length)throw new Error('返信が空でした');
+  Backend.lastModel=result.model||null;
+  Backend.usedFallback=result.fallback===true;
   return result.messages;
 }
 
@@ -663,12 +665,12 @@ function setView(){
     <button class="${S.mode==='light'?'on':''}" data-act="mode" data-id="light">ライト</button>
     <button class="${S.mode==='night'?'on':''}" data-act="mode" data-id="night">ダーク</button></div></div></div>
   <div class="sec"><b>会話AI（テスト）</b></div>
-  <div class="grp"><div class="cell"><label>返信エンジン</label><span>Gemini（サーバー接続）</span></div>
+  <div class="grp"><div class="cell"><label>返信エンジン</label><span>${Backend.lastModel?esc(Backend.lastModel)+(Backend.usedFallback?'（予備）':''):'Gemini（サーバー接続）'}</span></div>
   <div class="cell"><label>クラウド保存</label><span>${Backend.ready?'接続済み':'接続待ち'}</span></div></div>
   <p class="foot">固定返信は停止しています。返答はGeminiが生成します。APIキーはサーバー側で管理します。</p>
   <div class="sec"><b>データ</b></div>
   <div class="grp"><button class="danger" data-act="reset">友だちとトークをすべて削除</button></div>
-  <p class="foot" style="padding-bottom:28px">yoruAI 0.5</p></div>`;
+  <p class="foot" style="padding-bottom:28px">yoruAI 0.6</p></div>`;
 }
 
 /* --- トークルーム --- */
