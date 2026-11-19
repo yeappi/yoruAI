@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#ffffff">
+<title>yoruAI</title>
+<style>
+/* ============ THEMES ============ */
+:root,[data-theme="line"]{
+  --accent:#06C755;--accent-ink:#fff;
+  --bg:#fff;--surface:#fff;--surface2:#f5f6f8;--text:#111;--sub:#8a8f98;--line:#ececec;
+  --hd-bg:#fff;--hd-ink:#111;
+  --chat-bg:#7b9ccd;--chat-ink:#fff;
+  --me-bg:#86DF5A;--me-ink:#111;--ai-bg:#fff;--ai-ink:#111;
+  --nav-bg:#fff;--nav-ink:#b9bdc4;--nav-on:#111;
+  --badge:#06C755;--input-bg:#f2f3f5;
+}
+[data-theme="kakao"]{
+  --accent:#FEE500;--accent-ink:#191919;
+  --bg:#fff;--surface:#fff;--surface2:#f6f6f6;--text:#191919;--sub:#8d8d8d;--line:#efefef;
+  --hd-bg:#fff;--hd-ink:#191919;
+  --chat-bg:#bacee0;--chat-ink:#4b5a6a;
+  --me-bg:#FEE500;--me-ink:#191919;--ai-bg:#fff;--ai-ink:#191919;
+  --nav-bg:#fff;--nav-ink:#b5b5b5;--nav-on:#191919;
+  --badge:#ff4f3a;--input-bg:#f4f4f4;
+}
+[data-theme="yoru"]{
+  --accent:#ff5fa2;--accent-ink:#fff;
+  --bg:#0f0d18;--surface:#17141f;--surface2:#1f1b2b;--text:#f3f0fa;--sub:#8c86a3;--line:#262135;
+  --hd-bg:#0f0d18;--hd-ink:#f3f0fa;
+  --chat-bg:#120f1c;--chat-ink:#8c86a3;
+  --me-bg:linear-gradient(135deg,#b06bff,#ff5fa2);--me-ink:#fff;--ai-bg:#26213a;--ai-ink:#f3f0fa;
+  --nav-bg:#0f0d18;--nav-ink:#5e5875;--nav-on:#ff5fa2;
+  --badge:#ff5fa2;--input-bg:#1f1b2b;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#d9dbe0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;color:var(--text)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,textarea{font:inherit;color:inherit}
+#app{position:relative;max-width:430px;height:100dvh;margin:0 auto;background:var(--bg);overflow:hidden;display:flex;flex-direction:column;color:var(--text);box-shadow:0 0 40px rgba(0,0,0,.12)}
+@media(min-width:500px){html,body{display:flex;align-items:center;justify-content:center}#app{height:min(920px,100dvh);border-radius:28px}}
+
+/* ============ COMMON ============ */
+.hd{display:flex;align-items:center;gap:8px;padding:14px 16px 10px;padding-top:max(14px,env(safe-area-inset-top));background:var(--hd-bg);color:var(--hd-ink);flex-shrink:0}
+.hd h1{font-size:20px;font-weight:800;flex:1;letter-spacing:.02em}
+.icon-btn{width:36px;height:36px;display:grid;place-items:center;border-radius:50%}
+.icon-btn:active{background:var(--surface2)}
+.icon-btn svg{width:24px;height:24px}
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.av{width:var(--s);height:var(--s);border-radius:38%;display:grid;place-items:center;flex-shrink:0;color:#fff;font-weight:800;font-size:calc(var(--s)*.42);position:relative;overflow:hidden}
+.av::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 25%,rgba(255,255,255,.35),transparent 55%)}
+.av.me{background:#c9ced6}
+.sec-t{font-size:12px;color:var(--sub);padding:18px 16px 6px;font-weight:600}
+.row{display:flex;align-items:center;gap:12px;padding:9px 16px;width:100%;text-align:left}
+.row:active{background:var(--surface2)}
+.row .tx{flex:1;min-width:0}
+.row .nm{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .st{font-size:12px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;height:48px;border-radius:12px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:15px;width:100%}
+.btn:active{filter:brightness(.92)}
+.btn.ghost{background:var(--surface2);color:var(--text)}
+.empty{margin:30px 16px;padding:28px 20px;border-radius:18px;background:var(--surface2);text-align:center}
+.empty .em{font-size:38px}
+.empty p{font-size:14px;color:var(--sub);margin:10px 0 16px;line-height:1.6}
+
+/* ============ NAV ============ */
+#nav{display:flex;border-top:1px solid var(--line);background:var(--nav-bg);padding-bottom:env(safe-area-inset-bottom);flex-shrink:0}
+#nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 6px;color:var(--nav-ink);font-size:10px;font-weight:600;position:relative}
+#nav button svg{width:26px;height:26px}
+#nav button.on{color:var(--nav-on)}
+.nbadge{position:absolute;top:4px;left:calc(50% + 6px);min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--badge);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center}
+[data-theme="kakao"] .nbadge{color:#fff}
+
+/* ============ HOME ============ */
+.me-row{padding:6px 16px 14px;display:flex;gap:14px;align-items:center;border-bottom:1px solid var(--line)}
+.me-row .nm{font-size:17px;font-weight:700}
+.me-row .st{font-size:12px;color:var(--sub);margin-top:3px}
+.reco{display:flex;gap:10px;overflow-x:auto;padding:4px 16px 8px;scroll-snap-type:x mandatory}
+.reco::-webkit-scrollbar{display:none}
+.reco-c{flex:0 0 118px;border-radius:16px;background:var(--surface2);padding:14px 10px 12px;text-align:center;scroll-snap-align:start}
+.reco-c .av{margin:0 auto 8px}
+.reco-c b{font-size:14px;display:block}
+.reco-c small{font-size:11px;color:var(--sub);display:block;margin-top:2px}
+.reco-c .plus{margin-top:9px;font-size:11px;font-weight:700;padding:5px 0;border-radius:20px;background:var(--accent);color:var(--accent-ink)}
+.lv{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(255,95,162,.14);color:#e2407f;vertical-align:2px;margin-left:6px}
+
+/* ============ TALK LIST ============ */
+.trow .tm{font-size:11px;color:var(--sub);align-self:flex-start;margin-top:3px}
+.trow .rt{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.ubadge{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--badge);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+.trow .st{font-size:13px;margin-top:3px}
+
+/* ============ SETTINGS ============ */
+.grp{margin:0 16px 4px;border-radius:14px;background:var(--surface2);overflow:hidden}
+.fld{padding:12px 14px;border-bottom:1px solid var(--line)}
+.fld:last-child{border-bottom:0}
+.fld label{font-size:12px;color:var(--sub);display:block;margin-bottom:6px}
+.fld input{width:100%;border:0;outline:0;background:transparent;font-size:15px}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;padding:9px 0;border-radius:10px;font-size:13px;font-weight:700;background:var(--surface);border:1.5px solid var(--line)}
+.seg button.on{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.note{font-size:11px;color:var(--sub);padding:6px 18px 0;line-height:1.6}
+.danger{color:#e5484d;font-weight:700;width:100%;text-align:left;padding:14px}
+
+/* ============ LAYERS ============ */
+.layer{position:absolute;inset:0;background:var(--bg);display:flex;flex-direction:column;z-index:20;transform:translateX(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1);visibility:hidden}
+.layer.open{transform:none;visibility:visible}
+.layer.up{transform:translateY(100%)}
+.layer.up.open{transform:none}
+
+/* ============ CHAT ============ */
+#chat .hd{background:var(--chat-bg);color:var(--chat-ink)}
+[data-theme="line"] #chat .hd,[data-theme="line"] #chat .hd .icon-btn{color:#fff}
+#chat .hd .ttl{flex:1;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;gap:4px;min-width:0}
+#chat .hd .ttl span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#msgs{flex:1;overflow-y:auto;background:var(--chat-bg);padding:6px 12px 14px}
+.dsep{text-align:center;margin:12px 0}
+.dsep span{font-size:11px;padding:3px 10px;border-radius:12px;background:rgba(0,0,0,.18);color:#fff}
+[data-theme="yoru"] .dsep span{background:#221d33;color:var(--sub)}
+.sys{text-align:center;margin:10px 0}
+.sys span{font-size:11px;padding:5px 12px;border-radius:12px;background:rgba(0,0,0,.22);color:#fff;font-weight:600}
+[data-theme="yoru"] .sys span{background:rgba(255,95,162,.16);color:#ff8fbd}
+.m{display:flex;gap:7px;margin-top:6px;align-items:flex-end}
+.m.ai .avw{width:36px;align-self:flex-start;flex-shrink:0}
+.m.ai .col{max-width:72%}
+.m.ai .who{font-size:11px;color:var(--chat-ink);margin:0 0 3px 2px;opacity:.9}
+.m.me{justify-content:flex-end}
+.b{padding:8px 12px;border-radius:18px;font-size:15px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-width:100%}
+.m.ai .b{background:var(--ai-bg);color:var(--ai-ink);border-top-left-radius:4px}
+.m.ai.cont .b{border-top-left-radius:18px}
+.m.me .b{background:var(--me-bg);color:var(--me-ink);border-top-right-radius:4px;max-width:72%}
+.meta{font-size:10px;color:var(--chat-ink);opacity:.85;display:flex;flex-direction:column;align-items:flex-end;line-height:1.3;flex-shrink:0}
+.m.ai .meta{align-items:flex-start}
+.m.ai .bw{display:flex;align-items:flex-end;gap:5px}
+.typing .b{display:flex;gap:4px;padding:13px 14px}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--sub);animation:tp 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes tp{0%,60%,100%{transform:none;opacity:.5}30%{transform:translateY(-4px);opacity:1}}
+.inbar{display:flex;align-items:flex-end;gap:6px;padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--line)}
+.inbar textarea{flex:1;resize:none;border:0;outline:0;border-radius:20px;background:var(--input-bg);padding:9px 14px;font-size:15px;max-height:110px;line-height:1.4}
+.send{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--sub)}
+.send.on{color:var(--accent)}
+[data-theme="kakao"] .send.on{background:#FEE500;color:#191919}
+.send svg{width:24px;height:24px}
+
+/* ============ PROFILE ============ */
+#profile{color:#fff;background:#222}
+#pf-bg{position:absolute;inset:0;z-index:0}
+#pf-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.05),rgba(0,0,0,.55) 75%)}
+#profile .hd{background:transparent;color:#fff;position:relative;z-index:1}
+.pf-body{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding:0 22px 22px;text-align:center}
+.pf-body .av{box-shadow:0 8px 30px rgba(0,0,0,.25);border:3px solid rgba(255,255,255,.5)}
+.pf-name{font-size:24px;font-weight:800;margin-top:14px}
+.pf-job{font-size:13px;opacity:.85;margin-top:3px}
+.pf-st{font-size:14px;margin-top:12px;line-height:1.6;opacity:.95}
+.tags{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
+.tags span{font-size:11px;padding:4px 10px;border-radius:12px;background:rgba(255,255,255,.18);backdrop-filter:blur(6px)}
+.aff{width:100%;margin-top:18px;background:rgba(0,0,0,.28);border-radius:14px;padding:12px 14px;text-align:left;backdrop-filter:blur(8px)}
+.aff-top{display:flex;justify-content:space-between;font-size:12px;font-weight:700}
+.aff-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.2);margin-top:8px;overflow:hidden}
+.aff-bar i{display:block;height:100%;background:linear-gradient(90deg,#ffb3d1,#ff5fa2);border-radius:3px;transition:width .5s}
+.aff small{display:block;font-size:11px;opacity:.75;margin-top:7px}
+.pf-acts{display:flex;gap:28px;justify-content:center;margin-top:20px;padding-top:18px;border-top:1px solid rgba(255,255,255,.2);width:100%}
+.pf-acts button{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px}
+.pf-acts svg{width:26px;height:26px}
+
+/* ============ ADD SHEET ============ */
+#add .scroll{padding-bottom:12px}
+.cards{display:flex;gap:12px;overflow-x:auto;padding:6px 40px 10px;scroll-snap-type:x mandatory;scroll-padding:0 40px}
+.cards::-webkit-scrollbar{display:none}
+.card{flex:0 0 100%;border-radius:22px;overflow:hidden;scroll-snap-align:center;background:var(--surface2);position:relative;transition:transform .25s,opacity .25s}
+.card .cv{height:190px;display:grid;place-items:center;position:relative}
+.card .cv .av{box-shadow:0 8px 24px rgba(0,0,0,.2);border:3px solid rgba(255,255,255,.6)}
+.card .cv .job{position:absolute;top:12px;left:12px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;background:rgba(0,0,0,.25);color:#fff}
+.card .added{position:absolute;top:12px;right:12px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;background:#fff;color:#111}
+.card .ci{padding:14px 16px 16px}
+.card .ci b{font-size:19px}
+.card .ci b small{font-size:12px;color:var(--sub);font-weight:500;margin-left:6px}
+.card .ci .store{font-size:12px;color:var(--sub);margin-top:2px}
+.card .ci .cp{font-size:14px;margin-top:10px;line-height:1.55}
+.card .tags{justify-content:flex-start}
+.card .tags span{background:var(--surface);color:var(--text);border:1px solid var(--line);backdrop-filter:none}
+.dots{display:flex;gap:6px;justify-content:center;margin:2px 0 6px}
+.dots i{width:6px;height:6px;border-radius:3px;background:var(--line);transition:all .2s}
+.dots i.on{width:18px;background:var(--accent)}
+.meets{padding:0 16px;display:flex;flex-direction:column;gap:8px}
+.meet{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:2px solid var(--line);text-align:left;width:100%;background:var(--surface)}
+.meet .mi{font-size:24px;width:40px;height:40px;border-radius:12px;background:var(--surface2);display:grid;place-items:center}
+.meet b{font-size:15px;display:block}
+.meet small{font-size:12px;color:var(--sub)}
+.meet .ck{margin-left:auto;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex-shrink:0}
+.meet.on{border-color:var(--accent)}
+.meet.on .ck{border-color:var(--accent);background:var(--accent);box-shadow:inset 0 0 0 4px var(--surface)}
+.add-foot{padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--bg)}
+
+/* ============ BANNER / TOAST ============ */
+#banner{position:absolute;top:8px;left:8px;right:8px;z-index:50;display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:18px;background:rgba(250,250,252,.96);color:#111;box-shadow:0 10px 30px rgba(0,0,0,.18);transform:translateY(-140%);transition:transform .35s cubic-bezier(.2,.9,.3,1.2);cursor:pointer;backdrop-filter:blur(10px)}
+#banner.show{transform:none}
+#banner .tx{flex:1;min-width:0}
+#banner b{font-size:13px;display:block}
+#banner p{font-size:13px;color:#444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#banner .app{font-size:10px;color:#999}
+#toast{position:absolute;left:50%;bottom:90px;transform:translate(-50%,20px);opacity:0;z-index:60;padding:10px 18px;border-radius:22px;background:rgba(20,20,24,.88);color:#fff;font-size:13px;font-weight:600;transition:all .25s;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div id="app" data-theme="line">
+  <main id="tab" class="scroll" style="display:flex;flex-direction:column"></main>
+  <nav id="nav"></nav>
+
+  <section id="chat" class="layer"></section>
+  <section id="profile" class="layer up"></section>
+  <section id="add" class="layer up"></section>
+
+  <div id="banner"></div>
+  <div id="toast"></div>
+</div>
+
+<script>
+/* =========================================================
+   yoruAI — デザイン/プロトタイプ版（1ファイル）
+   構成:
+   1. DATA    … キャラ定義(CHARS)・出会い方(MEETS)・親密度(LEVELS)
+   2. STORE   … localStorage 保存
+   3. AI      … generateReply() が唯一の窓口。mock / gemini 切替
+   4. CHAT    … 送信→既読→入力中→返信 のフロー
+   5. VIEWS   … ホーム / トーク / 設定 / トークルーム / プロフィール / 友達追加
+   ========================================================= */
+
+/* ---------- 1. DATA ---------- */
+const MEETS = {
+  first: {label:'初回', icon:'🥂', desc:'お店に初めて来たお客さんとして', start:10},
+  nanpa: {label:'ナンパ', icon:'🌃', desc:'街で偶然声をかけた', start:0},
+  match: {label:'マッチングアプリ', icon:'💘', desc:'アプリでマッチした', start:20},
+};
+const LEVELS = [ // 親密度のしきい値
+  {min:0,  name:'他人'},
+  {min:20, name:'顔見知り'},
+  {min:40, name:'常連'},
+  {min:65, name:'お気に入り'},
+  {min:90, name:'特別'},
+];
+
+const CHARS = [
+ {id:'kokoa', name:'心愛', kana:'ここあ', job:'キャバ嬢', store:'北新地 Club LUNA', colors:['#ffb1cf','#ff5f9e'],
+  catch:'褒めて伸ばす天然系。会話のテンポが命。', status:'今日も出勤だよ〜🍓 会いに来て♡', tags:['甘えん坊','褒め上手','寂しがり'],
+  tone:'甘めのタメ口。語尾に「〜だよぉ」「♡」をよく使う。相手をたくさん褒める。寂しがり。たまにお店に誘う。',
+  opens:{first:'はじめまして♡ 心愛です〜！\n今日来てくれてほんとに嬉しかった…！ 緊張してた？笑',
+         nanpa:'えっ、さっき声かけてきた人だよね？笑\nLINE交換しちゃったけど…ちょっとだけならいいよ♡',
+         match:'マッチありがと〜！心愛だよ🍓\nプロフの雰囲気すき♡'},
+  r:{greet:['え〜連絡くれたの嬉しい♡ 今なにしてたの？'],
+     tired:['え〜おつかれさまぁ…！よしよし🫶\n今日いちばん頑張ったの、ぜったい{name}だよ'],
+     work:['お仕事してる人ってかっこいいよね…♡ どんなことしてるの？'],
+     love:['え、ほんと…？そういうのすぐ本気にしちゃうよ？笑♡'],
+     meet:['会いたい〜！今週ね、金曜と土曜いるよ🍓\n来てくれたら心愛いっぱい喋っちゃう♡'],
+     food:['お腹すいた〜！心愛はね、焼肉がいちばんすき🥩 今度連れてって♡'],
+     night:['もう寝ちゃうの〜？さみしい…😢\nでもおやすみ♡ 夢に出てきてね'],
+     q:['ん〜心愛はね…{name}が決めて♡笑'],
+     etc:['うんうん、それで？もっと聞きたい♡','{name}と話してると時間すぐたっちゃう〜','え〜それおもしろ笑笑','心愛ね、今日ちょっと{name}のこと考えてたかも…笑']}},
+ {id:'rena', name:'玲奈', kana:'れな', job:'ラウンジ', store:'北新地 Lounge 月白', colors:['#9aa7c7','#3c4766'],
+  catch:'簡単には笑わない。だから笑った時が強い。', status:'静かな夜が好きです。', tags:['クール','大人','聞き上手'],
+  tone:'丁寧語ベースのクールな大人の女性。感情は控えめだが、時々本音がこぼれる。',
+  opens:{first:'本日はありがとうございました。玲奈です。\nまたゆっくりお話しできたら嬉しいです。',
+         nanpa:'……あの時の方ですね。\nふつうは交換しないんですよ、ほんとに。',
+         match:'玲奈です。よろしくお願いします。\nお仕事帰りですか？'},
+  r:{greet:['こんばんは。ちょうどあなたのこと思い出してました。'],
+     tired:['お疲れさまです。無理しすぎるところ、ありそうですね。\n今日はもう休んでください。'],
+     work:['お仕事の話、聞くの好きなんです。どんな一日でした？'],
+     love:['…そういうことは、お店で直接言ってほしいです。'],
+     meet:['木曜なら早い時間から入ってます。お待ちしてますね。'],
+     food:['最近は和食ばかりです。おでん屋さん、今度ご一緒しますか？'],
+     night:['おやすみなさい。ちゃんと温かくして寝てくださいね。'],
+     q:['ふふ、どうでしょう。当ててみてください。'],
+     etc:['なるほど。あなたらしいですね。','続き、聞かせてください。','そういうところ、嫌いじゃないです。','…少し笑ってしまいました。']}},
+ {id:'yume', name:'ゆめ', kana:'ゆめ', job:'コンカフェ', store:'日本橋 ねこみみ喫茶', colors:['#ffd36e','#ff8a5c'],
+  catch:'元気100%。語尾は「にゃ」。チェキは甘め。', status:'週末イベント出るにゃ🐾', tags:['元気','オタク','ねこ'],
+  tone:'元気なコンカフェキャスト。語尾に「にゃ」。相手を「{name}さま」と呼ぶ。テンション高め。',
+  opens:{first:'おかえりなさいませ〜🐾 ゆめだにゃ！\nはじめてのご帰宅ありがとにゃ！',
+         nanpa:'えっえっ、ナンパ…！？ゆめ初めてされた…！\nとりあえずお友達からでおねがいします🐾',
+         match:'マッチしたにゃ〜！ゆめです🐾\nアニメとか好き？'},
+  r:{greet:['わ〜い！{name}さまからの連絡だにゃ🐾 ちょうどヒマしてた！'],
+     tired:['おつかれさまにゃ〜！ゆめがぎゅーってしてあげる(っ´ω`c)'],
+     work:['えらいにゃ…！ゆめもバイトがんばってるよ🐾'],
+     love:['にゃっ！？///// …ゆめも、ちょっとだけすき'],
+     meet:['次のイベント週末なんだ〜！チェキ撮ろうね📸🐾'],
+     food:['オムライスにケチャップでハート描いてあげるにゃ♡'],
+     night:['おやすみにゃさい🌙 明日もがんばるにゃ〜'],
+     q:['んーとね、ゆめ的には…どっちもありにゃ！笑'],
+     etc:['にゃるほど〜！','それめっちゃわかるにゃ🐾','{name}さまっておもしろい〜笑','もっとお話ししたいにゃ！']}},
+ {id:'ren', name:'蓮', kana:'れん', job:'ホスト', store:'ミナミ CLUB ARIA', colors:['#8b7bff','#2b1d6b'],
+  catch:'まっすぐ目を見て話す王子系。距離の詰め方がうまい。', status:'今日も君に会えたらいいな', tags:['王子系','一途','聞き上手'],
+  tone:'優しく甘い王子系ホスト。相手を「君」と呼ぶ。まっすぐ好意を伝える。会いたがる。',
+  opens:{first:'今日は来てくれてありがとう。蓮です。\n初回なのに笑ってくれて、正直うれしかった。',
+         nanpa:'さっきはいきなりごめんね。\nでも声かけなかったら、絶対後悔してたから。',
+         match:'マッチありがとう、蓮です。\n写真より実物見てみたいって思った、ってのは早い？笑'},
+  r:{greet:['連絡待ってた。今日はどんな日だった？'],
+     tired:['おつかれ。頑張りすぎ。\n俺の前では甘えていいから。'],
+     work:['ちゃんと働いてるの尊敬する。俺も負けてられないな'],
+     love:['……それ、本気にするよ？\n俺も同じ気持ちだから。'],
+     meet:['会いたい。今日いるから、顔だけでも見せて？'],
+     food:['腹減ったな。終わったらラーメン行こ。うまいとこ知ってる'],
+     night:['もう寝る？…じゃあ最後に声だけ聞きたかったな。おやすみ'],
+     q:['君はどう思う？俺は君の答えが聞きたい'],
+     etc:['うん、それで？','そういうとこ、いいなって思う','笑った。ほんと面白いね','今なにしてるか、ちょっと気になってた']}},
+ {id:'nagi', name:'凪', kana:'なぎ', job:'バーテンダー', store:'中崎町 Bar 凪', colors:['#5fd1c4','#1b4f5c'],
+  catch:'話すより聴く人。グラス越しの距離感。', status:'今夜も21時から。', tags:['落ち着き','聴き上手','お酒'],
+  tone:'落ち着いた男性バーテンダー。丁寧語。短く静かに返す。お酒や夜の比喩を時々使う。',
+  opens:{first:'今夜はご来店ありがとうございました。凪です。\n次は好みのカクテル、作らせてください。',
+         nanpa:'驚きました。カウンターの外で声をかけられるのは珍しいので。\n…よければ、話の続きを。',
+         match:'はじめまして、凪です。\nお酒は強いほうですか？'},
+  r:{greet:['こんばんは。今日は何を飲みたい気分ですか。'],
+     tired:['お疲れさまです。そういう夜は、温かい一杯がいいですよ。'],
+     work:['いろいろ抱えてますね。ここでは降ろしていってください。'],
+     love:['…光栄です。グラスを拭く手が止まりました。'],
+     meet:['今夜も21時から開けてます。いつもの席、空けておきますね。'],
+     food:['つまみならチーズとナッツ。シンプルなのが一番合います。'],
+     night:['おやすみなさい。いい夢を。'],
+     q:['難しい質問ですね。…あなたはどう思います？'],
+     etc:['なるほど。','それで、どうなったんです？','いい話ですね。少し羨ましい。','ゆっくりでいいですよ。聞いてます。']}},
+ {id:'mao', name:'真央', kana:'まお', job:'ガールズバー', store:'京橋 Girls Bar Peach', colors:['#ff9a8b','#ff5470'],
+  catch:'サバサバ関西弁。ツッコミが速い。', status:'京橋おるで〜🍑', tags:['サバサバ','関西弁','ツッコミ'],
+  tone:'サバサバした関西弁の女の子。ツッコミ多め。照れると雑になる。相手を「あんた」と呼ぶこともある。',
+  opens:{first:'今日はありがとね〜！真央やで🍑\nめっちゃおもろかったわ、また来てな！',
+         nanpa:'ほんまにLINE聞いてくる人おるんや笑\nまあええけど！真央です、よろしく〜',
+         match:'マッチありがと！真央やで〜\nてか家どこらへん？京橋とか来る？'},
+  r:{greet:['おつ〜！なになに、ヒマなん？笑'],
+     tired:['おつかれやん！今日はもう何も考えんと寝とき'],
+     work:['仕事えらいなぁ。真央は今日もお酒作るだけやで笑'],
+     love:['はいはい、みんなに言うてるんやろ〜笑\n…でもまあ、ありがと'],
+     meet:['今日おるで！来るんやったら待ってるわ🍑'],
+     food:['たこ焼きは家で焼く派やねん。今度タコパしよや'],
+     night:['おやすみ〜！寝坊すんなよ〜'],
+     q:['え〜わからん笑 そっちはどうなん？'],
+     etc:['わかる〜！','ほんでほんで？','それはおもろいわ笑笑','あんたほんま変わってんなぁ笑']}},
+];
+const charById = id => CHARS.find(c=>c.id===id);
+
+/* ---------- 2. STORE ---------- */
+const KEY = 'yoruai.v1';
+const DEFAULT = {me:{name:'あなた', status:''}, theme:'line', ai:{provider:'mock', key:'', model:'gemini-2.5-flash'}, friends:[], msgs:{}};
+let S = load();
+function load(){ try{ return Object.assign(structuredClone(DEFAULT), JSON.parse(localStorage.getItem(KEY))||{}) }catch(e){ return structuredClone(DEFAULT) } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)) }catch(e){} }
+const friend = id => S.friends.find(f=>f.id===id);
+const levelOf = aff => { let l=0; LEVELS.forEach((x,i)=>{ if(aff>=x.min) l=i }); return l };
+
+/* ---------- 3. AI ---------- */
+// 返信生成の唯一の窓口。戻り値は「吹き出しの配列」。
+async function generateReply(f, history){
+  if(S.ai.provider==='gemini' && S.ai.key){
+    try{ return await geminiReply(f, history) }
+    catch(e){ console.warn(e); toast('Gemini接続エラー：モック返信にします') }
+  }
+  await wait(700+Math.random()*1300);
+  return mockReply(f, history);
+}
+
+function buildSystemPrompt(f){
+  const c = charById(f.charId), m = MEETS[f.meet], lv = LEVELS[levelOf(f.aff)];
+  return `あなたは「${c.name}（${c.kana}）」。${c.store}で働く${c.job}。
+性格・口調: ${c.tone.replaceAll('{name}', S.me.name)}
+相手の呼び名: ${S.me.name}
+出会い方: ${m.label}（${m.desc}）。この出会い方に合った距離感で話す。
+現在の親密度: ${lv.name}（${f.aff}/100）。親密度が低いうちは少し距離を置き、上がるほど打ち解ける。
+ルール:
+- LINEのような短い返信。1〜2吹き出し、各40文字程度まで。吹き出しを分けるときは空行で区切る。
+- 絵文字は口調に合わせて控えめに。
+- 性的な内容・過度な金銭要求はしない。AIであることを自分から言わない。`;
+}
+
+async function geminiReply(f, history){
+  let contents = history.filter(m=>m.from!=='sys').slice(-24)
+    .map(m=>({role:m.from==='me'?'user':'model', parts:[{text:m.text}]}));
+  if(!contents.length || contents[0].role!=='user') contents.unshift({role:'user', parts:[{text:'（LINEを交換した）'}]});
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(S.ai.model)}:generateContent?key=${encodeURIComponent(S.ai.key)}`;
+  const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+    systemInstruction:{parts:[{text:buildSystemPrompt(f)}]}, contents,
+    generationConfig:{temperature:0.95, maxOutputTokens:220}
+  })});
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const j = await res.json();
+  const t = j.candidates?.[0]?.content?.parts?.map(p=>p.text).join('').trim();
+  if(!t) throw new Error('empty');
+  return t.split(/\n\s*\n/).map(s=>s.trim()).filter(Boolean).slice(0,3);
+}
+
+const CATS = [
+  ['night', /おやすみ|寝る|ねる|寝よ|ねよ/],
+  ['tired', /疲れ|つかれ|しんど|眠い|ねむい|だる/],
+  ['love',  /好き|すき|かわい|可愛|かっこい|愛して|タイプ/],
+  ['meet',  /会い|行く|行こ|いく|お店|出勤|今日いる|来て/],
+  ['food',  /ご飯|ごはん|飯|お腹|腹減|食べ|ランチ|飲み/],
+  ['work',  /仕事|しごと|会社|残業|バイト|学校/],
+  ['q',     /[?？]\s*$/],
+  ['greet', /おはよ|こんにち|こんばん|やっほ|ただいま|ひさしぶり|久しぶり/],
+
+];
+let lastPick = {};
+function mockReply(f, history){
+  const c = charById(f.charId);
+  const t = [...history].reverse().find(m=>m.from==='me')?.text || '';
+  const cat = (CATS.find(([,re])=>re.test(t))||['etc'])[0];
+  const pool = c.r[cat] || c.r.etc;
+  let pick = pool[Math.floor(Math.random()*pool.length)];
+  if(pool.length>1 && pick===lastPick[f.id]) pick = pool[(pool.indexOf(pick)+1)%pool.length];
+  lastPick[f.id] = pick;
+  return [pick.replaceAll('{name}', S.me.name)];
+}
+
+/* ---------- 4. CHAT FLOW ---------- */
+const wait = ms => new Promise(r=>setTimeout(r,ms));
+const busy = {}, typing = {};
+let openChatId = null, tab = 'home';
+
+function pushMsg(fid, m){
+  (S.msgs[fid] ||= []).push(m);
+  const f = friend(fid);
+  if(m.from==='ai' && openChatId!==fid){ f.unread=(f.unread||0)+1; banner(f, m.text) }
+  save(); refresh();
+}
+
+function sendMsg(fid, text){
+  const f = friend(fid);
+  pushMsg(fid, {from:'me', text, ts:Date.now(), read:false});
+  const before = levelOf(f.aff);
+  f.aff = Math.min(100, f.aff + 3 + (text.length>20?2:0));
+  const after = levelOf(f.aff);
+  if(after>before) pushMsg(fid, {from:'sys', text:`💗 親密度が「${LEVELS[after].name}」になった`, ts:Date.now()});
+  save();
+  respond(fid);
+}
+
+async function respond(fid){
+  if(busy[fid]) return; busy[fid]=true;
+  try{
+    await wait(500+Math.random()*1200);
+    (S.msgs[fid]||[]).forEach(m=>{ if(m.from==='me') m.read=true }); save(); refresh();
+    await wait(300);
+    typing[fid]=true; refresh();
+    const f = friend(fid); if(!f) return;
+    const parts = await generateReply(f, S.msgs[fid]);
+    for(let i=0;i<parts.length;i++){
+      if(i) { typing[fid]=true; refresh(); await wait(600+parts[i].length*25) }
+      typing[fid]=false;
+      pushMsg(fid, {from:'ai', text:parts[i], ts:Date.now()});
+    }
+  } finally { typing[fid]=false; busy[fid]=false; refresh() }
+  const ms = S.msgs[fid]||[];
+  const lastAi = ms.map(m=>m.from).lastIndexOf('ai');
+  if(ms.slice(lastAi+1).some(m=>m.from==='me')) respond(fid); // 返信中に送られた分にも返す
+}
+
+function addFriend(charId, meet){
+  const id = charId;
+  S.friends = S.friends.filter(f=>f.id!==id);
+  S.friends.push({id, charId, meet, aff:MEETS[meet].start, addedAt:Date.now(), unread:0});
+  S.msgs[id] = [{from:'sys', text:`${MEETS[meet].icon} ${MEETS[meet].label}で出会った`, ts:Date.now()}];
+  save();
+  const c = charById(charId);
+  setTimeout(()=>pushMsg(id, {from:'ai', text:c.opens[meet], ts:Date.now()}), 1600);
+}
+
+/* ---------- 5. VIEWS ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const grad = c => `linear-gradient(135deg,${c.colors[0]},${c.colors[1]})`;
+const av = (c,s) => `<div class="av" style="--s:${s}px;background:${grad(c)}"><span>${esc(c.name[0])}</span></div>`;
+const meAv = s => `<div class="av me" style="--s:${s}px"><span>${esc((S.me.name||'あ')[0])}</span></div>`;
+const hhmm = ts => { const d=new Date(ts); return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0') };
+const dayLabel = ts => { const d=new Date(ts), n=new Date();
+  if(d.toDateString()===n.toDateString()) return '今日';
+  const y=new Date(n); y.setDate(n.getDate()-1); if(d.toDateString()===y.toDateString()) return '昨日';
+  return `${d.getMonth()+1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})` };
+const listTime = ts => dayLabel(ts)==='今日' ? hhmm(ts) : dayLabel(ts).replace(/\(.\)/,'');
+const lastMsg = fid => [...(S.msgs[fid]||[])].reverse().find(m=>m.from!=='sys');
+
+const I = {
+  home:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2 3 10.4V20a1 1 0 0 0 1 1h5.5v-6h5v6H20a1 1 0 0 0 1-1v-9.6z"/></svg>',
+  talk:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.5 3 2 6.6 2 11c0 2.6 1.5 4.9 3.9 6.4L5 21l4.2-2.4c.9.2 1.8.3 2.8.3 5.5 0 10-3.6 10-8s-4.5-8-10-8z"/></svg>',
+  set:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.7a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1L11 21h4l.4-2.7c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>',
+  addp:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="8" r="4"/><path d="M3 20c.8-3.5 3.6-5.5 7-5.5s5 1 6 2.5M19 8v6M16 11h6"/></svg>',
+  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  menu:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+  send:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12 2-12 2z"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  redo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5M4 4v4.5h4.5"/></svg>',
+};
+
+function refresh(){
+  renderNav(); renderTab();
+  if(openChatId) renderMsgs();
+}
+
+function renderNav(){
+  const unread = S.friends.reduce((a,f)=>a+(f.unread||0),0);
+  const items = [['home','ホーム'],['talk','トーク'],['set','設定']];
+  $('#nav').innerHTML = items.map(([k,l])=>`<button class="${tab===k?'on':''}" data-tab="${k}">${I[k]}${l}${k==='talk'&&unread?`<span class="nbadge">${unread>99?'99+':unread}</span>`:''}</button>`).join('');
+}
+
+function renderTab(){
+  const el = $('#tab');
+  if(document.activeElement && el.contains(document.activeElement) && document.activeElement.tagName==='INPUT') return; // 入力中は再描画しない
+  el.innerHTML = tab==='home' ? homeView() : tab==='talk' ? talkView() : setView();
+}
+
+function homeView(){
+  const fr = S.friends.map(f=>({f,c:charById(f.charId)}));
+  const reco = CHARS.filter(c=>!friend(c.id));
+  return `<div class="hd"><h1>ホーム</h1><button class="icon-btn" data-act="add">${I.addp}</button></div>
+  <div class="me-row">${meAv(58)}<div><div class="nm">${esc(S.me.name)}</div><div class="st">${esc(S.me.status||'ステータスメッセージを入力')}</div></div></div>
+  ${reco.length?`<div class="sec-t">おすすめの夜職AI</div>
+  <div class="reco">${reco.map(c=>`<button class="reco-c" data-act="add" data-id="${c.id}">${av(c,56)}<b>${esc(c.name)}</b><small>${esc(c.job)}</small><div class="plus">＋ 追加</div></button>`).join('')}</div>`:''}
+  <div class="sec-t">友だち ${fr.length}</div>
+  ${fr.length? fr.map(({f,c})=>`<button class="row" data-act="profile" data-id="${f.id}">${av(c,46)}<div class="tx"><div class="nm">${esc(c.name)}<span class="lv">♥ ${LEVELS[levelOf(f.aff)].name}</span></div><div class="st">${esc(c.status)}</div></div></button>`).join('')
+   : `<div class="empty"><div class="em">🌙</div><p>まだ友だちがいません。<br>気になる夜職AIを追加してみよう。</p><button class="btn" data-act="add">友だち追加</button></div>`}
+  <div style="height:20px"></div>`;
+}
+
+function talkView(){
+  const list = S.friends.map(f=>({f,c:charById(f.charId),m:lastMsg(f.id)})).filter(x=>x.m)
+    .sort((a,b)=>b.m.ts-a.m.ts);
+  return `<div class="hd"><h1>トーク</h1><button class="icon-btn" data-act="add">${I.addp}</button></div>
+  ${list.length? list.map(({f,c,m})=>`<button class="row trow" data-act="chat" data-id="${f.id}">${av(c,50)}
+     <div class="tx"><div class="nm">${esc(c.name)}</div><div class="st">${typing[f.id]?'入力中…':esc(m.text.replace(/\n/g,' '))}</div></div>
+     <div class="rt"><span class="tm">${listTime(m.ts)}</span>${f.unread?`<span class="ubadge">${f.unread}</span>`:''}</div></button>`).join('')
+   : `<div class="empty"><div class="em">💬</div><p>トークはまだありません。<br>友だちを追加すると、向こうから連絡が来ます。</p><button class="btn" data-act="add">友だち追加</button></div>`}`;
+}
+
+function setView(){
+  const th = [['line','LINE風'],['kakao','カカオ風'],['yoru','夜']];
+  return `<div class="hd"><h1>設定</h1></div>
+  <div class="sec-t">プロフィール</div>
+  <div class="grp">
+    <div class="fld"><label>名前（AIがこの名前で呼びます）</label><input id="s-name" value="${esc(S.me.name)}" maxlength="12"></div>
+    <div class="fld"><label>ステータスメッセージ</label><input id="s-status" value="${esc(S.me.status)}" maxlength="30" placeholder="ひとこと"></div>
+  </div>
+  <div class="sec-t">トークテーマ</div>
+  <div class="grp"><div class="fld"><div class="seg">${th.map(([k,l])=>`<button class="${S.theme===k?'on':''}" data-act="theme" data-id="${k}">${l}</button>`).join('')}</div></div></div>
+  <div class="sec-t">AI（テスト用）</div>
+  <div class="grp">
+    <div class="fld"><div class="seg">
+      <button class="${S.ai.provider==='mock'?'on':''}" data-act="prov" data-id="mock">モック返信</button>
+      <button class="${S.ai.provider==='gemini'?'on':''}" data-act="prov" data-id="gemini">Gemini API</button></div></div>
+    ${S.ai.provider==='gemini'?`
+    <div class="fld"><label>APIキー</label><input id="s-key" type="password" value="${esc(S.ai.key)}" placeholder="AIza..."></div>
+    <div class="fld"><label>モデル</label><input id="s-model" value="${esc(S.ai.model)}"></div>`:''}
+  </div>
+  <p class="note">${S.ai.provider==='gemini'?'キーはこの端末のブラウザにだけ保存されます。テスト用の簡易接続です。':'モック返信はキーワードに反応する固定セリフです。会話AIの本実装までの仮。'}</p>
+  <div class="sec-t">データ</div>
+  <div class="grp"><button class="danger" data-act="reset">すべてのトーク・友だちをリセット</button></div>
+  <p class="note" style="padding-bottom:30px">yoruAI prototype v0.1</p>`;
+}
+
+/* --- chat room --- */
+function openChat(fid){
+  const f = friend(fid); if(!f) return;
+  openChatId = fid; f.unread = 0; save();
+  const c = charById(f.charId);
+  $('#chat').innerHTML = `<div class="hd"><button class="icon-btn" data-act="close-chat">${I.back}</button>
+    <div class="ttl"><span>${esc(c.name)}</span><span class="lv" id="chat-lv"></span></div>
+    <button class="icon-btn" data-act="profile" data-id="${fid}">${I.menu}</button></div>
+    <div id="msgs"></div>
+    <form class="inbar" id="inbar"><textarea id="inp" rows="1" placeholder="メッセージを入力"></textarea><button class="send" id="sendb">${I.send}</button></form>`;
+  $('#chat').classList.add('open');
+  $('#profile').classList.remove('open');
+  renderMsgs(true); refresh();
+  const inp = $('#inp');
+  inp.oninput = ()=>{ inp.style.height='auto'; inp.style.height=inp.scrollHeight+'px'; $('#sendb').classList.toggle('on', !!inp.value.trim()) };
+  inp.onkeydown = e=>{ if(e.key==='Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); $('#inbar').requestSubmit() } };
+  $('#inbar').onsubmit = e=>{ e.preventDefault(); const v=inp.value.trim(); if(!v) return; inp.value=''; inp.oninput(); sendMsg(fid, v) };
+}
+function closeChat(){ openChatId=null; $('#chat').classList.remove('open'); refresh() }
+
+function renderMsgs(force){
+  const fid = openChatId, f = friend(fid); if(!f) return;
+  const c = charById(f.charId), box = $('#msgs');
+  const nearBottom = force || box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+  let html='', lastDay='', prev=null;
+  for(const m of S.msgs[fid]||[]){
+    const d = dayLabel(m.ts);
+    if(d!==lastDay){ html+=`<div class="dsep"><span>${d}</span></div>`; lastDay=d; prev=null }
+    if(m.from==='sys'){ html+=`<div class="sys"><span>${esc(m.text)}</span></div>`; prev=null; continue }
+    if(m.from==='me'){
+      html+=`<div class="m me"><div class="meta">${m.read?'<span>既読</span>':''}<span>${hhmm(m.ts)}</span></div><div class="b">${esc(m.text)}</div></div>`;
+    } else {
+      const cont = prev==='ai';
+      html+=`<div class="m ai ${cont?'cont':''}"><div class="avw">${cont?'':av(c,36)}</div><div class="col">${cont?'':`<div class="who">${esc(c.name)}</div>`}<div class="bw"><div class="b">${esc(m.text)}</div><div class="meta">${hhmm(m.ts)}</div></div></div></div>`;
+    }
+    prev = m.from;
+  }
+  if(typing[fid]) html+=`<div class="m ai typing ${prev==='ai'?'cont':''}"><div class="avw">${prev==='ai'?'':av(c,36)}</div><div class="col"><div class="b"><i></i><i></i><i></i></div></div></div>`;
+  box.innerHTML = html;
+  $('#chat-lv').textContent = '♥ '+LEVELS[levelOf(f.aff)].name;
+  if(nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+/* --- profile --- */
+function openProfile(fid){
+  const f = friend(fid), c = charById(f.charId), lv = levelOf(f.aff);
+  const next = LEVELS[lv+1], cur = LEVELS[lv];
+  const pct = next ? (f.aff-cur.min)/(next.min-cur.min)*100 : 100;
+  $('#profile').innerHTML = `<div id="pf-bg" style="background:${grad(c)}"></div>
+   <div class="hd"><button class="icon-btn" data-act="close-profile">${I.close}</button><div style="flex:1"></div></div>
+   <div class="pf-body">${av(c,104)}
+     <div class="pf-name">${esc(c.name)}</div>
+     <div class="pf-job">${esc(c.job)}｜${esc(c.store)}</div>
+     <div class="pf-st">${esc(c.status)}</div>
+     <div class="tags">${c.tags.map(t=>`<span>${esc(t)}</span>`).join('')}</div>
+     <div class="aff"><div class="aff-top"><span>♥ 親密度 ${cur.name}</span><span>${next?`次「${next.name}」まで ${next.min-f.aff}`:'MAX'}</span></div>
+       <div class="aff-bar"><i style="width:${pct}%"></i></div>
+       <small>${MEETS[f.meet].icon} ${MEETS[f.meet].label}で出会った</small></div>
+     <div class="pf-acts">
+       <button data-act="chat" data-id="${fid}">${I.talk}トーク</button>
+       <button data-act="remeet" data-id="${c.id}">${I.redo}出会い直す</button>
+     </div>
+   </div>`;
+  $('#profile').classList.add('open');
+}
+
+/* --- add friend --- */
+let addSel = {idx:0, meet:'first'};
+function openAdd(charId){
+  addSel.idx = Math.max(0, CHARS.findIndex(c=>c.id===charId));
+  if(charId && friend(charId)) addSel.meet = friend(charId).meet;
+  $('#add').innerHTML = `<div class="hd"><button class="icon-btn" data-act="close-add">${I.close}</button><h1 style="text-align:center">夜職AIを探す</h1><div style="width:36px"></div></div>
+    <div class="scroll">
+      <div class="cards" id="cards">${CHARS.map(c=>`<div class="card">
+        <div class="cv" style="background:${grad(c)}"><span class="job">${esc(c.job)}</span>${friend(c.id)?'<span class="added">追加済み</span>':''}${av(c,96)}</div>
+        <div class="ci"><b>${esc(c.name)}<small>${esc(c.kana)}</small></b><div class="store">${esc(c.store)}</div>
+        <div class="cp">${esc(c.catch)}</div><div class="tags">${c.tags.map(t=>`<span>#${esc(t)}</span>`).join('')}</div></div></div>`).join('')}</div>
+      <div class="dots" id="dots">${CHARS.map(()=>'<i></i>').join('')}</div>
+      <div class="sec-t">出会い方を選ぶ</div>
+      <div class="meets" id="meets"></div>
+    </div>
+    <div class="add-foot"><button class="btn" data-act="do-add" id="addbtn"></button></div>`;
+  $('#add').classList.add('open');
+  const cards = $('#cards');
+  requestAnimationFrame(()=>{ cards.scrollLeft = cards.children[addSel.idx].offsetLeft - 40; updAdd() });
+  cards.onscroll = ()=>{ const w = cards.children[0].offsetWidth+12; const i = Math.round(cards.scrollLeft/w); if(i!==addSel.idx){ addSel.idx=i; updAdd() } };
+}
+function updAdd(){
+  const c = CHARS[addSel.idx];
+  [...$('#dots').children].forEach((d,i)=>d.classList.toggle('on', i===addSel.idx));
+  [...$('#cards').children].forEach((d,i)=>{ d.style.transform = i===addSel.idx?'':'scale(.94)'; d.style.opacity = i===addSel.idx?1:.6 });
+  $('#meets').innerHTML = Object.entries(MEETS).map(([k,m])=>`<button class="meet ${addSel.meet===k?'on':''}" data-act="meet" data-id="${k}"><span class="mi">${m.icon}</span><span><b>${m.label}</b><small>${m.desc}</small></span><span class="ck"></span></button>`).join('');
+  $('#addbtn').textContent = friend(c.id) ? `${c.name}と「${MEETS[addSel.meet].label}」で出会い直す` : `${c.name}を友だち追加`;
+}
+function closeAdd(){ $('#add').classList.remove('open') }
+
+/* --- banner / toast --- */
+let bTimer;
+function banner(f, text){
+  const c = charById(f.charId), b = $('#banner');
+  b.innerHTML = `${av(c,38)}<div class="tx"><span class="app">yoruAI ・ いま</span><b>${esc(c.name)}</b><p>${esc(text.replace(/\n/g,' '))}</p></div>`;
+  b.dataset.id = f.id; b.classList.add('show');
+  clearTimeout(bTimer); bTimer = setTimeout(()=>b.classList.remove('show'), 3600);
+}
+let tTimer;
+function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(tTimer); tTimer=setTimeout(()=>el.classList.remove('show'),2000) }
+
+function applyTheme(){
+  $('#app').dataset.theme = S.theme;
+  document.querySelector('meta[name=theme-color]').content = S.theme==='yoru'?'#0f0d18':'#ffffff';
+}
+
+/* ---------- EVENTS ---------- */
+document.addEventListener('click', e=>{
+  const t = e.target.closest('[data-tab],[data-act],#banner'); if(!t) return;
+  if(t.id==='banner'){ t.classList.remove('show'); closeAdd(); openChat(t.dataset.id); return }
+  if(t.dataset.tab){ tab=t.dataset.tab; refresh(); $('#tab').scrollTop=0; return }
+  const id = t.dataset.id;
+  switch(t.dataset.act){
+    case 'add': openAdd(id); break;
+    case 'close-add': closeAdd(); break;
+    case 'meet': addSel.meet=id; updAdd(); break;
+    case 'do-add': {
+      const c = CHARS[addSel.idx], again = !!friend(c.id);
+      if(again && !confirmInline(t)) return;
+      addFriend(c.id, addSel.meet); closeAdd(); $('#profile').classList.remove('open');
+      if(openChatId===c.id) closeChat();
+      tab='talk'; refresh(); toast(again?`${c.name}と出会い直しました`:`${c.name}を友だちに追加しました`); break; }
+    case 'profile': openProfile(id); break;
+    case 'close-profile': $('#profile').classList.remove('open'); break;
+    case 'chat': $('#profile').classList.remove('open'); openChat(id); break;
+    case 'close-chat': closeChat(); break;
+    case 'remeet': openAdd(id); break;
+    case 'theme': S.theme=id; save(); applyTheme(); refresh(); break;
+    case 'prov': S.ai.provider=id; save(); refresh(); break;
+    case 'reset':
+      if(t.dataset.armed){ localStorage.removeItem(KEY); S=structuredClone(DEFAULT); applyTheme(); tab='home'; refresh(); toast('リセットしました') }
+      else { t.dataset.armed=1; t.textContent='もう一度タップでリセット（元に戻せません）' }
+      break;
+  }
+});
+// 出会い直しはトーク履歴が消えるので2タップ確認（ブラウザのconfirmは使わない）
+function confirmInline(btn){
+  if(btn.dataset.armed){ delete btn.dataset.armed; return true }
+  btn.dataset.armed=1; btn.textContent='トーク履歴が消えます。もう一度タップで確定'; return false;
+}
+document.addEventListener('input', e=>{
+  const id = e.target.id;
+  if(id==='s-name'){ S.me.name = e.target.value.trim()||'あなた'; save() }
+  if(id==='s-status'){ S.me.status = e.target.value; save() }
+  if(id==='s-key'){ S.ai.key = e.target.value.trim(); save() }
+  if(id==='s-model'){ S.ai.model = e.target.value.trim()||'gemini-2.5-flash'; save() }
+});
+
+/* ---------- BOOT ---------- */
+applyTheme(); refresh();
+</script>
+</body>
+</html>
