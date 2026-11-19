@@ -355,7 +355,44 @@ function load(){try{
   if(!GENDERS[o.me.gender])o.me.gender='male';
   return o;
 }catch(e){return structuredClone(DEFAULT)} }
-const Backend={client:null,ready:false,userId:null,displayId:null,pendingName:null,lastModel:null,usedFallback:false,hydrating:false,saveTimer:null,queue:Promise.resolve()};
+const Backend={client:null,ready:false,userId:null,displayId:null,pendingName:null,lastModel:null,usedFallback:false,engineVersion:'engine-1.0.0',hydrating:false,saveTimer:null,queue:Promise.resolve()};
+const ENGINE_FEATURES={
+  persona:'人格と口調',relationship:'関係性',mood:'気分',memory:'長期記憶',initiative:'自発性'
+};
+function ensureEngine(){
+  if(!S.engine||typeof S.engine!=='object')S.engine={};
+  const e=S.engine;
+  if(!e.settings)e.settings={};
+  if(!e.settings.flags)e.settings.flags={};
+  for(const k of Object.keys(ENGINE_FEATURES))if(typeof e.settings.flags[k]!=='boolean')e.settings.flags[k]=true;
+  e.settings.styleNote=String(e.settings.styleNote||'').slice(0,350);
+  e.settings.revision=Math.max(1,Number(e.settings.revision)||1);
+  if(!e.actors||typeof e.actors!=='object')e.actors={};
+  if(!Array.isArray(e.logs))e.logs=[];
+  if(!Array.isArray(e.evaluations))e.evaluations=[];
+  return e;
+}
+ensureEngine();
+function actorState(fid){return ensureEngine().actors[fid]||null;}
+function applyEngineResult(fid,result,history,elapsedMs,mode){
+  if(!result?.engineState)return;
+  const e=ensureEngine();
+  e.actors[fid]=result.engineState;
+  const f=friend(fid);
+  if(f&&e.settings.flags.relationship!==false){
+    const r=result.engineState.relationship||{};
+    f.aff=Math.min(100,Math.max(0,Math.round((r.closeness||0)*.55+(r.trust||0)*.25+(r.attraction||0)*.20)));
+  }
+  Backend.engineVersion=result.engineVersion||Backend.engineVersion;
+  const input=history.filter(m=>m.from==='me').slice(-1)[0]?.text||'（自動メッセージ）';
+  e.logs.unshift({id:Date.now()+'-'+Math.floor(Math.random()*100000),fid,mode:mode||'reply',
+    input:input.slice(0,300),output:result.messages.join(' / ').slice(0,500),
+    model:result.model||'',version:Backend.engineVersion,
+    revision:e.settings.revision,elapsedMs,at:Date.now(),rating:0,
+    features:{...e.settings.flags}});
+  e.logs=e.logs.slice(0,60);
+  save();
+}
 function cleanState(){const copy=structuredClone(S);copy.ai=Object.assign({},copy.ai,{key:'',provider:'gemini'});delete copy.ai.manualMock;return copy}
 function save(){
   S.ai.key='';
@@ -426,6 +463,7 @@ async function connectUser(userId){
       const {error:writeError}=await Backend.client.from('app_states').upsert({user_id:userId,state:cleanState()});
       if(writeError)throw writeError;
     }
+    ensureEngine();
     Backend.userId=userId;
     Backend.displayId='YA-'+userId.replaceAll('-','').slice(0,12).toUpperCase();
     if(Backend.pendingName){
@@ -437,6 +475,7 @@ async function connectUser(userId){
     save();
     document.getElementById('auth-gate')?.classList.remove('show');
     applyMode();refresh();toast('クラウド接続完了');
+    setTimeout(()=>maybeNudgeOnReturn(),1800);
   }catch(e){
     console.error('Supabase connection failed',e);
     showAuthGate('Supabaseへの保存に失敗しました: '+(e.message||e));
@@ -469,17 +508,19 @@ const levelOf = aff => { let l=0; LEVELS.forEach((x,i)=>{ if(aff>=x.min) l=i });
 
 /* ---------- 3. AI ---------- */
 // 返信生成の唯一の窓口。戻り値は「吹き出しの配列」。
-async function generateReply(f,history,initialGreeting=false){
-  return geminiReply(f,history,initialGreeting);
-}
-async function geminiReply(f,history,initialGreeting=false){
+async function requestEngine(f,history,options={}){
   if(!Backend.ready||!Backend.client)throw new Error('クラウドへの接続が必要です');
   const {data:{session},error:authError}=await Backend.client.auth.getSession();
   if(authError||!session?.access_token)throw new Error('ログインが必要です');
+  const e=ensureEngine();
   const payload={
     charId:f.charId,meet:f.meet,affinity:f.aff,
-    userName:S.me.name,userGender:S.me.gender,initialGreeting,
-    history:history.filter(m=>m.from==='me'||m.from==='ai').slice(-24).map(m=>({from:m.from,text:m.text}))
+    userName:S.me.name,userGender:S.me.gender,
+    initialGreeting:options.initialGreeting===true,
+    mode:options.mode||'reply',baseline:options.baseline===true,
+    history:history.filter(m=>m.from==='me'||m.from==='ai').slice(-24).map(m=>({from:m.from,text:m.text})),
+    engineState:actorState(f.id),
+    engineSettings:{flags:e.settings.flags,styleNote:e.settings.styleNote}
   };
   const res=await fetch('/api/chat',{
     method:'POST',
@@ -489,9 +530,38 @@ async function geminiReply(f,history,initialGreeting=false){
   const result=await res.json().catch(()=>({}));
   if(!res.ok)throw new Error(result.error||'HTTP '+res.status);
   if(!Array.isArray(result.messages)||!result.messages.length)throw new Error('返信が空でした');
+  return result;
+}
+async function generateReply(f,history,initialGreeting=false){
+  const start=performance.now();
+  const result=await requestEngine(f,history,{initialGreeting,mode:initialGreeting?'greeting':'reply'});
   Backend.lastModel=result.model||null;
   Backend.usedFallback=result.fallback===true;
+  applyEngineResult(f.id,result,history,Math.round(performance.now()-start),initialGreeting?'greeting':'reply');
   return result.messages;
+}
+async function maybeNudgeOnReturn(){
+  if(!Backend.ready||ensureEngine().settings.flags.initiative===false)return;
+  const now=Date.now();
+  const candidates=S.friends.filter(f=>{
+    const msgs=S.msgs[f.id]||[];
+    const userTurns=msgs.filter(m=>m.from==='me').length;
+    const last=msgs.filter(m=>m.from==='me'||m.from==='ai').slice(-1)[0]?.ts||now;
+    const state=actorState(f.id);
+    return userTurns>=3 && now-last>10*3600000 && now-last<30*86400000 &&
+      now-(state?.lastNudgeAt||0)>24*3600000 &&
+      !busy[f.id]&&!greetBusy[f.id];
+  }).sort((a,b)=>(S.msgs[b.id]?.slice(-1)[0]?.ts||0)-(S.msgs[a.id]?.slice(-1)[0]?.ts||0));
+  const f=candidates[0];if(!f)return;
+  busy[f.id]=true;typing[f.id]=true;refresh();
+  try{
+    const history=S.msgs[f.id]||[];
+    const begin=performance.now();
+    const result=await requestEngine(f,history,{mode:'nudge'});
+    applyEngineResult(f.id,result,history,Math.round(performance.now()-begin),'nudge');
+    for(const text of result.messages)pushMsg(f.id,{from:'ai',text,ts:Date.now()});
+  }catch(e){console.warn('Nudge skipped',e.message);}
+  finally{busy[f.id]=false;typing[f.id]=false;refresh();}
 }
 
 /* ---------- 4. CHAT FLOW ---------- */
@@ -510,10 +580,7 @@ function sendMsg(fid, text){
   if(!Backend.ready){toast('接続を準備中です');return}
   const f = friend(fid);
   pushMsg(fid, {from:'me', text, ts:Date.now(), read:false});
-  const before = levelOf(f.aff);
-  f.aff = Math.min(100, f.aff + 3 + (text.length>20?2:0));
-  const after = levelOf(f.aff);
-  if(after>before) pushMsg(fid, {from:'sys', text:`💗 親密度が「${LEVELS[after].name}」になった`, ts:Date.now()});
+  // Relationship changes come from the interpreted conversation, not message count.
   save();
   if(!greetBusy[fid]) respond(fid);
 }
@@ -549,6 +616,7 @@ function addFriend(charId, meet){
   S.friends = S.friends.filter(f=>f.id!==id);
   S.friends.push({id, charId, meet, aff:MEETS[meet].start, addedAt:Date.now(), unread:0});
   S.msgs[id] = [{from:'sys', text:`${MEETS[meet].icon} ${MEETS[meet].label}で出会った`, ts:Date.now()}];
+  ensureEngine().actors[id]=null;
   save();
   startGreeting(id,S.friends.find(f=>f.id===id).addedAt);
 }
