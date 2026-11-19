@@ -198,6 +198,15 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
 #banner p{font-size:14px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #toast{position:absolute;left:50%;bottom:calc(76px + env(safe-area-inset-bottom));z-index:60;transform:translateX(-50%);opacity:0;padding:10px 16px;border-radius:10px;background:rgba(24,24,27,.9);color:#fff;font-size:13px;white-space:nowrap;transition:opacity .2s;pointer-events:none}
 #toast.show{opacity:1}
+
+#auth-gate{display:none;position:fixed;inset:0;z-index:9000;background:rgba(20,20,24,.64);align-items:center;justify-content:center;padding:22px}
+#auth-gate.show{display:flex}
+#auth-gate .auth-panel{width:min(360px,100%);background:#fff;color:#24242a;border-radius:18px;padding:25px;box-shadow:0 18px 60px rgba(0,0,0,.2);font-family:inherit}
+#auth-gate h3{margin:0 0 8px;font-size:20px}
+#auth-gate p{font-size:13px;line-height:1.6;color:#555;margin:8px 0 15px;overflow-wrap:anywhere}
+#auth-gate input{display:block;width:100%;padding:12px;margin:9px 0;border:1px solid #ddd;border-radius:9px;font-size:16px;box-sizing:border-box}
+#auth-gate button{width:100%;padding:12px;border:none;border-radius:10px;background:#d95172;color:#fff;font-weight:700;margin:5px 0}
+#auth-gate small{color:#666;display:block;font-size:12px;margin:9px 0}
 </style>
 </head>
 <body>
@@ -211,6 +220,7 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
   <div id="toast" role="status"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
 <script>
 /* =========================================================
    yoruAI — プロトタイプ（1ファイル）
@@ -332,52 +342,138 @@ const charById = id => CHARS.find(c=>c.id===id);
 /* ---------- 2. STORE ---------- */
 const KEY = 'yoruai.v1';
 const GENDERS = {male:'男性', female:'女性'};
-const DEFAULT = {me:{name:'あなた', status:'', gender:'male'}, mode:'light', ai:{provider:'mock', key:'', model:'gemini-2.5-flash'}, friends:[], msgs:{}};
+const DEFAULT = {me:{name:'あなた', status:'', gender:'male'}, mode:'light', ai:{provider:'gemini', key:'', model:'gemini-2.5-flash'}, friends:[], msgs:{}};
 let S = load();
-function load(){ try{ const d=structuredClone(DEFAULT), j=JSON.parse(localStorage.getItem(KEY))||{}; const o=Object.assign(d,j); o.me=Object.assign(structuredClone(DEFAULT.me), j.me||{}); if(!['light','night'].includes(o.mode)) o.mode='light'; if(!GENDERS[o.me.gender]) o.me.gender='male'; return o }catch(e){ return structuredClone(DEFAULT) } }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)) }catch(e){} }
+function load(){try{
+  const d=structuredClone(DEFAULT),j=JSON.parse(localStorage.getItem(KEY))||{},o=Object.assign(d,j);
+  o.me=Object.assign(structuredClone(DEFAULT.me),j.me||{});
+  o.ai=Object.assign(structuredClone(DEFAULT.ai),j.ai||{});
+  if(o.ai.provider==='mock'&&!o.ai.manualMock)o.ai.provider='gemini';
+  o.ai.key=''; // clear any old API key saved in this prototype
+  localStorage.setItem(KEY,JSON.stringify(o));
+  if(!['light','night'].includes(o.mode))o.mode='light';
+  if(!GENDERS[o.me.gender])o.me.gender='male';
+  return o;
+}catch(e){return structuredClone(DEFAULT)} }
+const Backend={client:null,ready:false,userId:null,hydrating:false,saveTimer:null,queue:Promise.resolve()};
+function cleanState(){const copy=structuredClone(S);copy.ai=Object.assign({},copy.ai,{key:''});return copy}
+function save(){
+  S.ai.key='';
+  try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+  if(!Backend.ready)return;
+  clearTimeout(Backend.saveTimer);
+  Backend.saveTimer=setTimeout(()=>{
+    const state=cleanState(),user_id=Backend.userId;
+    Backend.queue=Backend.queue.then(async()=>{
+      const {error}=await Backend.client.from('app_states').upsert({user_id,state,updated_at:new Date().toISOString()});
+      if(error)throw error;
+    }).catch(e=>{console.error('Cloud save failed',e);toast('クラウド保存に失敗しました')});
+  },500);
+}
+function showAuthGate(message){
+  let el=document.getElementById('auth-gate');
+  if(!el){el=document.createElement('div');el.id='auth-gate';document.body.appendChild(el)}
+  el.innerHTML='<div class="auth-panel"><h3>yoruAI にログイン</h3><p id="auth-info"></p>'+
+    '<form id="auth-email"><input id="auth-address" type="email" required autocomplete="email" placeholder="メールアドレス"><button type="submit">メールでログイン</button></form>'+
+    '<form id="auth-code" style="display:none"><input id="auth-token" inputmode="numeric" placeholder="メールで届いた認証コード"><button type="submit">コードを確認</button></form>'+
+    '<small>メールのログインリンクを開く方法でもログインできます。</small></div>';
+  el.classList.add('show');
+  document.getElementById('auth-info').textContent=message||'会話を保存するためログインしてください。';
+  document.getElementById('auth-email').onsubmit=async e=>{
+    e.preventDefault();
+    const email=document.getElementById('auth-address').value.trim();
+    const {error}=await Backend.client.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin,shouldCreateUser:true}});
+    if(error){document.getElementById('auth-info').textContent='送信エラー: '+error.message;return}
+    Backend.loginEmail=email;
+    document.getElementById('auth-info').textContent='メールを送信しました。リンクを開くか、認証コードを入力してください。';
+    document.getElementById('auth-code').style.display='block';
+  };
+  document.getElementById('auth-code').onsubmit=async e=>{
+    e.preventDefault();
+    const token=document.getElementById('auth-token').value.trim();
+    const {data,error}=await Backend.client.auth.verifyOtp({email:Backend.loginEmail,token,type:'email'});
+    if(error){document.getElementById('auth-info').textContent='認証エラー: '+error.message;return}
+    if(data.user)await connectUser(data.user.id);
+  };
+}
+async function connectUser(userId){
+  if(Backend.hydrating||Backend.ready)return;
+  Backend.hydrating=true;
+  try{
+    const {data,error}=await Backend.client.from('app_states').select('state').eq('user_id',userId).maybeSingle();
+    if(error)throw error;
+    if(data?.state&&Object.keys(data.state).length){
+      const existing=data.state;
+      S=Object.assign(structuredClone(DEFAULT),existing);
+      S.me=Object.assign(structuredClone(DEFAULT.me),existing.me||{});
+      S.ai=Object.assign(structuredClone(DEFAULT.ai),existing.ai||{});
+      S.ai.key='';
+    }else{
+      const {error:writeError}=await Backend.client.from('app_states').upsert({user_id:userId,state:cleanState()});
+      if(writeError)throw writeError;
+    }
+    Backend.userId=userId;
+    Backend.ready=true;
+    localStorage.setItem(KEY,JSON.stringify(cleanState()));
+    document.getElementById('auth-gate')?.classList.remove('show');
+    applyMode();refresh();toast('クラウド接続完了');
+  }catch(e){
+    console.error('Supabase connection failed',e);
+    showAuthGate('Supabaseへの保存に失敗しました: '+(e.message||e));
+  }finally{Backend.hydrating=false}
+}
+async function initBackend(){
+  try{
+    const r=await fetch('/api/config',{cache:'no-store'});
+    const config=await r.json();
+    if(!r.ok)throw new Error(config.error||'設定取得エラー');
+    if(!window.supabase?.createClient)throw new Error('Supabaseのライブラリを読み込めません');
+    Backend.client=window.supabase.createClient(config.supabaseUrl,config.supabaseKey,{
+      auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+    });
+    Backend.client.auth.onAuthStateChange((event,session)=>{
+      if(event==='SIGNED_IN'&&session?.user?.id&&!Backend.ready)setTimeout(()=>connectUser(session.user.id),0);
+    });
+    const {data:{session},error}=await Backend.client.auth.getSession();
+    if(error)throw error;
+    if(session?.user?.id){await connectUser(session.user.id);return}
+    const anon=await Backend.client.auth.signInAnonymously();
+    if(anon.error){showAuthGate('匿名ログインが利用できないため、メールでログインしてください。');return}
+    if(anon.data.user)await connectUser(anon.data.user.id);
+  }catch(e){
+    console.error('Backend startup failed',e);
+    if(Backend.client)showAuthGate('接続に失敗しました: '+(e.message||e));
+    else toast('サーバー設定が読み込めません');
+  }
+}
 const friend = id => S.friends.find(f=>f.id===id);
 const levelOf = aff => { let l=0; LEVELS.forEach((x,i)=>{ if(aff>=x.min) l=i }); return l };
 
 /* ---------- 3. AI ---------- */
 // 返信生成の唯一の窓口。戻り値は「吹き出しの配列」。
-async function generateReply(f, history){
-  if(S.ai.provider==='gemini' && S.ai.key){
-    try{ return await geminiReply(f, history) }
-    catch(e){ console.warn(e); toast('Gemini接続エラー：モック返信にします') }
-  }
+async function generateReply(f,history){
+  if(S.ai.provider==='gemini')return geminiReply(f,history);
   await wait(700+Math.random()*1300);
-  return mockReply(f, history);
+  return mockReply(f,history);
 }
-
-function buildSystemPrompt(f){
-  const c = charById(f.charId), m = MEETS[f.meet], lv = LEVELS[levelOf(f.aff)];
-  return `あなたは「${c.name}（${c.kana}）」。${c.store}で働く${c.job}。
-性格・口調: ${c.tone.replaceAll('{name}', S.me.name)}
-相手の呼び名: ${S.me.name}
-相手の性別: ${GENDERS[S.me.gender]}
-出会い方: ${m.label}（${m.desc}）。この出会い方に合った距離感で話す。
-現在の親密度: ${lv.name}（${f.aff}/100）。親密度が低いうちは少し距離を置き、上がるほど打ち解ける。
-ルール:
-- LINEのような短い返信。1〜2吹き出し、各40文字程度まで。吹き出しを分けるときは空行で区切る。
-- 絵文字は口調に合わせて控えめに。
-- 性的な内容・過度な金銭要求はしない。AIであることを自分から言わない。`;
-}
-
-async function geminiReply(f, history){
-  let contents = history.filter(m=>m.from!=='sys').slice(-24)
-    .map(m=>({role:m.from==='me'?'user':'model', parts:[{text:m.text}]}));
-  if(!contents.length || contents[0].role!=='user') contents.unshift({role:'user', parts:[{text:'（LINEを交換した）'}]});
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(S.ai.model)}:generateContent?key=${encodeURIComponent(S.ai.key)}`;
-  const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
-    systemInstruction:{parts:[{text:buildSystemPrompt(f)}]}, contents,
-    generationConfig:{temperature:0.95, maxOutputTokens:220}
-  })});
-  if(!res.ok) throw new Error('HTTP '+res.status);
-  const j = await res.json();
-  const t = j.candidates?.[0]?.content?.parts?.map(p=>p.text).join('').trim();
-  if(!t) throw new Error('empty');
-  return t.split(/\n\s*\n/).map(s=>s.trim()).filter(Boolean).slice(0,3);
+async function geminiReply(f,history){
+  if(!Backend.ready||!Backend.client)throw new Error('クラウドへの接続が必要です');
+  const {data:{session},error:authError}=await Backend.client.auth.getSession();
+  if(authError||!session?.access_token)throw new Error('ログインが必要です');
+  const payload={
+    charId:f.charId,meet:f.meet,affinity:f.aff,
+    userName:S.me.name,userGender:S.me.gender,
+    history:history.filter(m=>m.from==='me'||m.from==='ai').slice(-24).map(m=>({from:m.from,text:m.text}))
+  };
+  const res=await fetch('/api/chat',{
+    method:'POST',
+    headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},
+    body:JSON.stringify(payload)
+  });
+  const result=await res.json().catch(()=>({}));
+  if(!res.ok)throw new Error(result.error||'HTTP '+res.status);
+  if(!Array.isArray(result.messages)||!result.messages.length)throw new Error('返信が空でした');
+  return result.messages;
 }
 
 const CATS = [
@@ -416,6 +512,7 @@ function pushMsg(fid, m){
 }
 
 function sendMsg(fid, text){
+  if(!Backend.ready){toast('接続を準備中です');return}
   const f = friend(fid);
   pushMsg(fid, {from:'me', text, ts:Date.now(), read:false});
   const before = levelOf(f.aff);
@@ -440,6 +537,10 @@ async function respond(fid){
       typing[fid]=false;
       pushMsg(fid, {from:'ai', text:parts[i], ts:Date.now()});
     }
+  } catch(e){
+    console.error('AI response error',e);
+    toast('AI返信エラー');
+    pushMsg(fid,{from:'sys',text:'⚠️ AI返信エラー: '+String(e.message||e).slice(0,140),ts:Date.now()});
   } finally { typing[fid]=false; busy[fid]=false; refresh() }
   const ms = S.msgs[fid]||[];
   const lastAi = ms.map(m=>m.from).lastIndexOf('ai');
@@ -545,11 +646,9 @@ function setView(){
     <div class="cell"><label>返信</label><span class="sp"></span><div class="seg">
       <button class="${S.ai.provider==='mock'?'on':''}" data-act="prov" data-id="mock">固定</button>
       <button class="${S.ai.provider==='gemini'?'on':''}" data-act="prov" data-id="gemini">Gemini</button></div></div>
-    ${S.ai.provider==='gemini'?`
-    <div class="cell"><label for="s-key">APIキー</label><input id="s-key" type="password" value="${esc(S.ai.key)}" placeholder="未入力"></div>
-    <div class="cell"><label for="s-model">モデル</label><input id="s-model" value="${esc(S.ai.model)}"></div>`:''}
+    ${S.ai.provider==='gemini'?`<div class="cell"><label>AI接続</label><span>サーバー経由のGemini</span></div>`:''}
   </div>
-  <p class="foot">${S.ai.provider==='gemini'?'APIキーはこの端末のブラウザにだけ保存されます。':'固定は、送った言葉に合わせて用意したセリフから返します。'}</p>
+  <p class="foot">${S.ai.provider==='gemini'?'APIキーはサーバー側で管理します。':'固定は、送った言葉に合わせて用意したセリフから返します。'}</p>
   <div class="sec"><b>データ</b></div>
   <div class="grp"><button class="danger" data-act="reset">友だちとトークをすべて削除</button></div>
   <p class="foot" style="padding-bottom:28px">yoruAI 0.3</p></div>`;
@@ -666,6 +765,7 @@ document.addEventListener('click', e=>{
     case 'close-add': closeAdd(); break;
     case 'meet': addSel.meet=id; updAdd(); break;
     case 'do-add': {
+      if(!Backend.ready){toast('接続を準備中です');break}
       const c = CHARS[addSel.idx], again = !!friend(c.id);
       if(again && !t.dataset.armed){ t.dataset.armed=1; t.textContent='トーク履歴が消えます。もう一度押して確定'; return }
       addFriend(c.id, addSel.meet); closeAdd(); $('#profile').classList.remove('open');
@@ -678,9 +778,9 @@ document.addEventListener('click', e=>{
     case 'remeet': openAdd(id); break;
     case 'gender': S.me.gender=id; save(); refresh(); break;
     case 'mode': S.mode=id; save(); applyMode(); refresh(); break;
-    case 'prov': S.ai.provider=id; save(); refresh(); break;
+    case 'prov': S.ai.provider=id; S.ai.manualMock=(id==='mock'); save(); refresh(); break;
     case 'reset':
-      if(t.dataset.armed){ localStorage.removeItem(KEY); S=structuredClone(DEFAULT); applyMode(); tab='home'; refresh(); toast('削除しました') }
+      if(t.dataset.armed){ S=structuredClone(DEFAULT); save(); applyMode(); tab='home'; refresh(); toast('削除しました') }
       else { t.dataset.armed=1; t.textContent='もう一度押すと削除します（元に戻せません）' }
       break;
   }
@@ -689,12 +789,10 @@ document.addEventListener('input', e=>{
   const id = e.target.id;
   if(id==='s-name'){ S.me.name = e.target.value.trim()||'あなた'; save() }
   if(id==='s-status'){ S.me.status = e.target.value; save() }
-  if(id==='s-key'){ S.ai.key = e.target.value.trim(); save() }
-  if(id==='s-model'){ S.ai.model = e.target.value.trim()||'gemini-2.5-flash'; save() }
 });
 
 /* ---------- BOOT ---------- */
-applyMode(); refresh();
+applyMode(); refresh(); initBackend();
 </script>
 </body>
 </html>
