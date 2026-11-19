@@ -216,7 +216,7 @@ function toIcon(file){
 
 // ----- 試し話
 function mountTry(read){
-  const t=st.tryChat||(st.tryChat={history:[],state:null,meet:'first',gender:'male',name:'テスト'});
+  const t=st.tryChat||(st.tryChat={history:[],state:null,profile:null,meet:'first',gender:'male',name:'テスト'});
   const box=$('#try');
   const draw=()=>{
     box.innerHTML=`<div class="form" style="padding:12px 16px 16px">
@@ -226,12 +226,12 @@ function mountTry(read){
         <input type="text" id="t-name" value="${esc(t.name)}" maxlength="20" aria-label="呼ばれる名前">
       </div>
       <div class="msgs" id="t-msgs">${t.history.length?t.history.map(m=>`<div class="b ${m.from}">${esc(m.text)}</div>`).join(''):'<span class="note">「最初のあいさつ」で、出会った直後の一言を見られます。</span>'}</div>
-      ${t.state?`<p class="note">関係: ${esc(Relation.note(t.state.relationship)||'—')}　／　気分 ${t.state.mood?.valence>0?'+':''}${t.state.mood?.valence} (${esc(t.state.mood?.reason||'')})</p>`:''}
+      ${t.profile?.requests?.length?`<p class="note">頼まれたこと: ${esc(t.profile.requests.map(x=>x.text).join(' / '))}</p>`:''}${t.state?`<p class="note">関係: ${esc(Relation.note(t.state.relationship)||'—')}　／　気分 ${t.state.mood?.valence>0?'+':''}${t.state.mood?.valence} (${esc(t.state.mood?.reason||'')})</p>`:''}
       <div class="send"><input type="text" id="t-in" placeholder="メッセージ" aria-label="メッセージ"><button class="btn" id="t-go">送信</button></div>
       <div style="display:flex;gap:10px;margin-top:10px"><button class="btn sub" id="t-first" type="button">最初のあいさつ</button><button class="btn sub" id="t-reset" type="button">リセット</button></div></div>`;
     $('#t-meet').value=t.meet;$('#t-gender').value=t.gender;
     const m=$('#t-msgs');m.scrollTop=m.scrollHeight;
-    $('#t-reset').onclick=()=>{t.history=[];t.state=null;draw()};
+    $('#t-reset').onclick=()=>{t.history=[];t.state=null;t.profile=null;draw()};
     $('#t-first').onclick=()=>run(null);
     $('#t-go').onclick=()=>{const v=$('#t-in').value.trim();if(v)run(v)};
     $('#t-in').onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();const v=$('#t-in').value.trim();if(v)run(v)}};
@@ -242,9 +242,9 @@ function mountTry(read){
     if(text){t.history.push({from:'me',text})}else{t.history=[];t.state=null}
     draw();$('#t-go').disabled=true;
     try{
-      const r=await api('try',{cast:st.edit.cast,meetKey:t.meet,userName:t.name,userGender:t.gender,history:t.history,engineState:t.state});
+      const r=await api('try',{cast:st.edit.cast,meetKey:t.meet,userName:t.name,userGender:t.gender,history:t.history,engineState:t.state,profile:t.profile});
       for(const x of r.messages)t.history.push({from:'ai',text:x});
-      t.state=r.engineState;
+      t.state=r.engineState;t.profile=r.profile||t.profile;
     }catch(e){toast(e.message)}
     draw();
   };
@@ -273,7 +273,8 @@ function viewConvo(){
   <h2>状態</h2><div class="state"><b>関係:</b> ${esc(Relation.note(a?.relationship)||'まだ記録なし')}${a?.relationship?`<br>${Object.entries(a.relationship).map(([k,x])=>k+' '+Math.round(x)).join(' / ')}`:''}
     ${a?.mood?`<br><b>気分:</b> ${a.mood.valence>0?'+':''}${a.mood.valence}・元気 ${Math.round(a.mood.energy)}（${esc(a.mood.reason||'')}）`:''}
     ${a?.memories?.length?`<br><b>記憶:</b> ${a.memories.slice(-6).map(m=>esc(m.text)).join(' / ')}`:''}
-    ${a?.intent?`<br><b>途中の話題:</b> ${esc(a.intent)}`:''}</div>
+    ${a?.intent?`<br><b>途中の話題:</b> ${esc(a.intent)}`:''}
+    ${c.profile?.requests?.length?`<br><b>頼まれたこと（全AI共通）:</b> ${c.profile.requests.map(x=>esc(x.text)).join(' / ')}`:''}</div>
   <button class="btn" id="to-push">${esc(cast?.name||'')}から連絡する</button>`:''}`;
   $('#back').onclick=()=>{st.convo=null;render()};
   $('#reload').onclick=async()=>{try{const sel=c.sel;st.convo=await api('convo',{userId:u.userId});st.convo.sel=sel;render()}catch(e){toast(e.message)}};

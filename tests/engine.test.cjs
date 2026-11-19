@@ -96,3 +96,32 @@ test('admin casts: DB rows add, override and remove casts; builtin defaults rest
   E.setCasts([]);
   assert.equal(Object.keys(E.CASTS).length,6);assert.equal(E.CASTS.hana,undefined);
 });
+
+test('user requests: detected, remembered across casts, enforced, and put at top of prompt',()=>{
+  const d=E.detectRequests('句読点つけないでって言ったよね');
+  assert.equal(d[0].key,'punct');assert.ok(d[0].evidence.includes('句読点'));
+  assert.equal(E.detectRequests('敬語やめて')[0].key,'tame');
+  assert.match(E.detectRequests('たろうって呼んで')[0].text,/たろう/);
+  assert.equal(E.detectRequests('そう呼んで').length,0,'generic words are not names');
+  assert.equal(E.detectRequests('今日は暑いね').length,0);
+  // advanceProfile: needs memory flag; removal via reverse request
+  let p=E.advanceProfile(null,{memory:{}},{userText:'句読点やめて',flags:{}});
+  assert.equal(p.requests.length,1);
+  assert.equal(E.advanceProfile(p,{memory:{}},{userText:'句読点やめて',flags:{memory:false}}).requests.length,1,'memory flag off leaves profile unchanged');
+  assert.equal(E.advanceProfile(p,{memory:{}},{userText:'やっぱり句読点つけて',flags:{}}).requests.length,0);
+  // model-extracted request must quote the user verbatim
+  const m={memory:{text:'絵文字を使わない',evidence:'絵文字いらない',kind:'request'}};
+  assert.equal(E.advanceProfile(null,m,{userText:'絵文字いらないんだよね',flags:{}}).requests.length,1);
+  assert.equal(E.advanceProfile(null,m,{userText:'別の話',flags:{}}).requests.length,0);
+  // enforcement
+  assert.deepEqual(E.enforce(['お疲れ様です。','今日は、疲れました。'],p.requests),['お疲れ様です','今日は 疲れました']);
+  assert.deepEqual(E.enforce(['はい。'],[]),['はい。']);
+  // prompt: requests at top priority for this very turn (before they are saved), name guidance present
+  const out=E.build({charId:'mao',character:E.CASTS.mao,meet:'x',userName:'たろう',userGender:'male',
+    history:[{from:'me',text:'句読点つけないで'}],mode:'reply',settings:{},state:null,profile:null});
+  assert.match(out.system,/相手から頼まれた話し方[\s\S]*句点/);
+  assert.match(out.system,/たろう/);
+  const noMem=E.build({charId:'mao',character:E.CASTS.mao,meet:'x',userName:'a',userGender:'male',
+    history:[{from:'me',text:'句読点つけないで'}],mode:'reply',settings:{flags:{memory:false}},state:null,profile:null});
+  assert.ok(!/相手から頼まれた話し方/.test(noMem.system));
+});

@@ -362,6 +362,7 @@ function applyEngineResult(fid,result,history,elapsedMs,mode){
   if(!result?.engineState)return;
   const e=ensureEngine();
   e.actors[fid]=result.engineState;
+  if(result.profile&&Array.isArray(result.profile.requests))e.profile={requests:result.profile.requests.slice(-8)};
   const f=friend(fid);
   if(f&&e.settings.flags.relationship!==false){
     const r=result.engineState.relationship||{};
@@ -507,7 +508,7 @@ async function requestEngine(f,history,options={}){
     initialGreeting:options.initialGreeting===true,
     mode:options.mode||'reply',baseline:options.baseline===true,
     history:history.filter(m=>m.from==='me'||m.from==='ai').slice(-24).map(m=>({from:m.from,text:m.text})),
-    engineState:actorState(f.id),
+    engineState:actorState(f.id),profile:ensureEngine().profile||null,
     engineSettings:{flags:e.settings.flags,styleNote:e.settings.styleNote}
   };
   const res=await fetch('/api/chat',{

@@ -147,7 +147,7 @@ module.exports=async function handler(req,res){
         const s=row.state||{};
         await refreshCasts(pw);
         return res.json({ok:true,user:summarize(row),me:s.me||{},msgs:s.msgs||{},
-          actors:s.engine?.actors||{},
+          actors:s.engine?.actors||{},profile:s.engine?.profile||null,
           casts:Object.fromEntries(Object.values(Engine.CASTS).map(c=>[c.id,{name:c.name,icon:c.icon||''}]))});
       }
       case 'try':{ // 下書きの人格で試し話。保存はしない
@@ -161,7 +161,7 @@ module.exports=async function handler(req,res){
         try{
           const out=await reply({apiKey:process.env.GEMINI_API_KEY,meetText:MEETS[meetKey],cast:Engine.CASTS[charId],
             body:{charId,meet:meetKey,affinity:0,userName:str(body.userName||'テスト',20),userGender:body.userGender==='female'?'female':'male',
-              initialGreeting:initial,mode:'reply',history,engineState:body.engineState||null,engineSettings:{}}});
+              initialGreeting:initial,mode:'reply',history,engineState:body.engineState||null,profile:body.profile||null,engineSettings:{}}});
           return res.status(out.status).json(out.json);
         }finally{delete Engine.CASTS[charId];}
       }
@@ -177,7 +177,7 @@ module.exports=async function handler(req,res){
         const out=await reply({apiKey:process.env.GEMINI_API_KEY,meetText:MEETS[f.meet]||MEETS.first,cast,
           body:{charId,meet:Object.hasOwn(MEETS,f.meet)?f.meet:'first',affinity:Number(f.aff)||0,userName:str(s.me?.name||'あなた',20),
             userGender:s.me?.gender==='female'?'female':'male',initialGreeting:history.length===0,
-            mode:history.length?'nudge':'reply',history,engineState:s.engine?.actors?.[f.id]||null,
+            mode:history.length?'nudge':'reply',history,engineState:s.engine?.actors?.[f.id]||null,profile:s.engine?.profile||null,
             engineSettings:{styleNote:'開発者からの指示。この内容に自然に触れる一通を書く: '+str(body.instruction,200)}}});
         return res.status(out.status).json(out.status===200?{ok:true,messages:out.json.messages}:out.json);
       }
