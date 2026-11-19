@@ -7,6 +7,14 @@ const MEETS = {
 };
 // A warm instance throttle is only a trial-level safeguard, not a distributed quota.
 const throttle = new Map();
+const buckets = new Map();
+function hit(key, limit, windowMs) {
+  const now = Date.now();
+  let b = buckets.get(key);
+  if (!b || now - b.start >= windowMs) { b = {start:now,count:0}; buckets.set(key,b); }
+  if (buckets.size > 10000) { for (const [k,v] of buckets) if (now - v.start >= windowMs) buckets.delete(k); if (buckets.size > 10000) buckets.clear(); }
+  return ++b.count <= limit;
+}
 let primaryOverloadedUntil = 0;
 const quotaBackoffUntil = new Map();
 
@@ -35,6 +43,10 @@ module.exports = async function handler(req, res) {
     if (++state.count > 25) return res.status(429).json({error:'少し時間をおいてから送信してください'});
     throttle.set(user.id,state);
     if (throttle.size > 5000) throttle.clear();
+    // 匿名アカウントは無限に作れるので、アカウント単位だけでは足りない。IP単位と全体にも上限をかける。
+    const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+    if (!hit('ip:'+ip, 60, 60000) || !hit('all', 400, 60000) || !hit('day:'+user.id, 600, 86400000))
+      return res.status(429).json({error:'少し時間をおいてから送信してください'});
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     const cast = Object.hasOwn(Engine.CASTS, body.charId) ? Engine.CASTS[body.charId] : null;
@@ -89,7 +101,6 @@ module.exports = async function handler(req, res) {
     let lastFailure = null;
     for (const {model,attempt} of attempts) {
       const generationConfig = {temperature:0.85,maxOutputTokens:2048,responseMimeType:'application/json'};
-      if (model === 'gemini-3.8-flash') generationConfig.thinkingConfig={thinkingLevel:'low'};
       let reply;
       try {
         reply = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' +
