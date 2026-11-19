@@ -159,6 +159,7 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
 .aff .bar{flex:1;height:4px;border-radius:2px;background:var(--fill);overflow:hidden}
 .aff .bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
 .aff .nx{color:var(--sub);flex-shrink:0;font-size:12px}
+.pf-note{margin:8px 0 0;font-size:12px;color:var(--sub);text-align:center}
 .pf-meta{display:flex;justify-content:space-between;font-size:13px;color:var(--sub);padding:14px 0 18px;border-bottom:1px solid var(--hair)}
 .pf-meta span:last-child{color:var(--text)}
 .acts{display:flex;justify-content:center;gap:48px;padding-top:16px}
@@ -199,14 +200,20 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
 #toast{position:absolute;left:50%;bottom:calc(76px + env(safe-area-inset-bottom));z-index:60;transform:translateX(-50%);opacity:0;padding:10px 16px;border-radius:10px;background:rgba(24,24,27,.9);color:#fff;font-size:13px;white-space:nowrap;transition:opacity .2s;pointer-events:none}
 #toast.show{opacity:1}
 
-#auth-gate{display:none;position:fixed;inset:0;z-index:9000;background:rgba(20,20,24,.64);align-items:center;justify-content:center;padding:22px}
+#auth-gate{display:none;position:fixed;inset:0;z-index:9000;background:var(--bg);color:var(--text);font-family:var(--font);align-items:center;justify-content:center;padding:24px;overflow-y:auto}
 #auth-gate.show{display:flex}
-#auth-gate .auth-panel{width:min(360px,100%);background:#fff;color:#24242a;border-radius:18px;padding:25px;box-shadow:0 18px 60px rgba(0,0,0,.2);font-family:inherit}
-#auth-gate h3{margin:0 0 8px;font-size:20px}
-#auth-gate p{font-size:13px;line-height:1.6;color:#555;margin:8px 0 15px;overflow-wrap:anywhere}
-#auth-gate input{display:block;width:100%;padding:12px;margin:9px 0;border:1px solid #ddd;border-radius:9px;font-size:16px;box-sizing:border-box}
-#auth-gate button{width:100%;padding:12px;border:none;border-radius:10px;background:#d95172;color:#fff;font-weight:700;margin:5px 0}
-#auth-gate small{color:#666;display:block;font-size:12px;margin:9px 0}
+#auth-gate .auth-panel{width:min(340px,100%);display:flex;flex-direction:column;align-items:stretch}
+#auth-gate .auth-logo{width:56px;height:56px;border-radius:16px;background:var(--accent);color:#fff;font-size:26px;font-weight:800;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;letter-spacing:-.02em}
+#auth-gate h3{margin:0 0 6px;font-size:22px;font-weight:700;text-align:center;letter-spacing:.01em}
+#auth-gate p{font-size:14px;line-height:1.6;color:var(--sub);text-align:center;margin:0 0 24px;overflow-wrap:anywhere}
+#auth-gate input{display:block;width:100%;padding:14px 16px;margin:0 0 12px;border:0;border-radius:12px;background:var(--fill);color:var(--text);font:inherit;font-size:16px;box-sizing:border-box;outline:none}
+#auth-gate input::placeholder{color:var(--faint)}
+#auth-gate input:focus-visible{box-shadow:0 0 0 2px var(--accent)}
+#auth-gate button{width:100%;text-align:center;padding:14px;border:none;border-radius:12px;background:var(--accent);color:#fff;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+#auth-gate button:active{background:var(--accent-press)}
+#auth-gate button:disabled{opacity:.5}
+#auth-gate button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#auth-gate small{color:var(--sub);display:block;font-size:12px;line-height:1.6;text-align:center;margin:16px 0 0}
 
 /* 会話ラボ。既存のホーム・トークUIと切り離す。 */
 #lab{z-index:30;background:var(--group)}
@@ -248,6 +255,8 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.js"></script>
+<script src="/casts.js"></script>
+<script src="/relation.js"></script>
 <script src="/lab-ui.js"></script>
 <script src="/reply-timing.js"></script>
 <script>
@@ -262,10 +271,11 @@ input,textarea{font:inherit;color:inherit;caret-color:var(--accent)}
 
 /* ---------- 1. DATA ---------- */
 const MEETS = {
-  first: {label:'初回', icon:'🥂', desc:'お店に初めて来たお客さんとして', start:10},
-  nanpa: {label:'ナンパ', icon:'🌃', desc:'街で偶然声をかけた', start:0},
-  match: {label:'マッチングアプリ', icon:'💘', desc:'アプリでマッチした', start:20},
+  first: {label:'初回', icon:'🥂', desc:'お店に初めて来たお客さんとして'},
+  nanpa: {label:'ナンパ', icon:'🌃', desc:'街で偶然声をかけた'},
+  match: {label:'マッチングアプリ', icon:'💘', desc:'アプリでマッチした'},
 };
+for(const k in MEETS) MEETS[k].start = Relation.affinityOf(Relation.seed(k)); // エンジンの初期値と同じ式で出す
 const LEVELS = [ // 親密度のしきい値
   {min:0,  name:'他人'},
   {min:20, name:'顔見知り'},
@@ -274,98 +284,7 @@ const LEVELS = [ // 親密度のしきい値
   {min:90, name:'特別'},
 ];
 
-const CHARS = [
- {id:'kokoa', name:'心愛', kana:'ここあ', job:'キャバ嬢', store:'北新地 Club LUNA', colors:['#ffb1cf','#ff5f9e'],
-  catch:'褒めて伸ばす天然系。会話のテンポが命。', status:'今日も出勤だよ〜🍓 会いに来て♡', tags:['甘えん坊','褒め上手','寂しがり'],
-  tone:'甘めのタメ口。語尾に「〜だよぉ」「♡」をよく使う。相手をたくさん褒める。寂しがり。たまにお店に誘う。',
-  opens:{first:'はじめまして♡ 心愛です〜！\n今日来てくれてほんとに嬉しかった…！ 緊張してた？笑',
-         nanpa:'えっ、さっき声かけてきた人だよね？笑\nLINE交換しちゃったけど…ちょっとだけならいいよ♡',
-         match:'マッチありがと〜！心愛だよ🍓\nプロフの雰囲気すき♡'},
-  r:{greet:['え〜連絡くれたの嬉しい♡ 今なにしてたの？'],
-     tired:['え〜おつかれさまぁ…！よしよし🫶\n今日いちばん頑張ったの、ぜったい{name}だよ'],
-     work:['お仕事してる人ってかっこいいよね…♡ どんなことしてるの？'],
-     love:['え、ほんと…？そういうのすぐ本気にしちゃうよ？笑♡'],
-     meet:['会いたい〜！今週ね、金曜と土曜いるよ🍓\n来てくれたら心愛いっぱい喋っちゃう♡'],
-     food:['お腹すいた〜！心愛はね、焼肉がいちばんすき🥩 今度連れてって♡'],
-     night:['もう寝ちゃうの〜？さみしい…😢\nでもおやすみ♡ 夢に出てきてね'],
-     q:['ん〜心愛はね…{name}が決めて♡笑'],
-     etc:['うんうん、それで？もっと聞きたい♡','{name}と話してると時間すぐたっちゃう〜','え〜それおもしろ笑笑','心愛ね、今日ちょっと{name}のこと考えてたかも…笑']}},
- {id:'rena', name:'玲奈', kana:'れな', job:'ラウンジ', store:'北新地 Lounge 月白', colors:['#9aa7c7','#3c4766'],
-  catch:'簡単には笑わない。だから笑った時が強い。', status:'静かな夜が好きです。', tags:['クール','大人','聞き上手'],
-  tone:'丁寧語ベースのクールな大人の女性。感情は控えめだが、時々本音がこぼれる。',
-  opens:{first:'本日はありがとうございました。玲奈です。\nまたゆっくりお話しできたら嬉しいです。',
-         nanpa:'……あの時の方ですね。\nふつうは交換しないんですよ、ほんとに。',
-         match:'玲奈です。よろしくお願いします。\nお仕事帰りですか？'},
-  r:{greet:['こんばんは。ちょうどあなたのこと思い出してました。'],
-     tired:['お疲れさまです。無理しすぎるところ、ありそうですね。\n今日はもう休んでください。'],
-     work:['お仕事の話、聞くの好きなんです。どんな一日でした？'],
-     love:['…そういうことは、お店で直接言ってほしいです。'],
-     meet:['木曜なら早い時間から入ってます。お待ちしてますね。'],
-     food:['最近は和食ばかりです。おでん屋さん、今度ご一緒しますか？'],
-     night:['おやすみなさい。ちゃんと温かくして寝てくださいね。'],
-     q:['ふふ、どうでしょう。当ててみてください。'],
-     etc:['なるほど。あなたらしいですね。','続き、聞かせてください。','そういうところ、嫌いじゃないです。','…少し笑ってしまいました。']}},
- {id:'yume', name:'ゆめ', kana:'ゆめ', job:'コンカフェ', store:'日本橋 ねこみみ喫茶', colors:['#ffd36e','#ff8a5c'],
-  catch:'元気100%。語尾は「にゃ」。チェキは甘め。', status:'週末イベント出るにゃ🐾', tags:['元気','オタク','ねこ'],
-  tone:'元気なコンカフェキャスト。語尾に「にゃ」。相手を「{name}さま」と呼ぶ。テンション高め。',
-  opens:{first:'おかえりなさいませ〜🐾 ゆめだにゃ！\nはじめてのご帰宅ありがとにゃ！',
-         nanpa:'えっえっ、ナンパ…！？ゆめ初めてされた…！\nとりあえずお友達からでおねがいします🐾',
-         match:'マッチしたにゃ〜！ゆめです🐾\nアニメとか好き？'},
-  r:{greet:['わ〜い！{name}さまからの連絡だにゃ🐾 ちょうどヒマしてた！'],
-     tired:['おつかれさまにゃ〜！ゆめがぎゅーってしてあげる(っ´ω`c)'],
-     work:['えらいにゃ…！ゆめもバイトがんばってるよ🐾'],
-     love:['にゃっ！？///// …ゆめも、ちょっとだけすき'],
-     meet:['次のイベント週末なんだ〜！チェキ撮ろうね📸🐾'],
-     food:['オムライスにケチャップでハート描いてあげるにゃ♡'],
-     night:['おやすみにゃさい🌙 明日もがんばるにゃ〜'],
-     q:['んーとね、ゆめ的には…どっちもありにゃ！笑'],
-     etc:['にゃるほど〜！','それめっちゃわかるにゃ🐾','{name}さまっておもしろい〜笑','もっとお話ししたいにゃ！']}},
- {id:'ren', name:'蓮', kana:'れん', job:'ホスト', store:'ミナミ CLUB ARIA', colors:['#8b7bff','#2b1d6b'],
-  catch:'まっすぐ目を見て話す王子系。距離の詰め方がうまい。', status:'今日も君に会えたらいいな', tags:['王子系','一途','聞き上手'],
-  tone:'優しく甘い王子系ホスト。相手を「君」と呼ぶ。まっすぐ好意を伝える。会いたがる。',
-  opens:{first:'今日は来てくれてありがとう。蓮です。\n初回なのに笑ってくれて、正直うれしかった。',
-         nanpa:'さっきはいきなりごめんね。\nでも声かけなかったら、絶対後悔してたから。',
-         match:'マッチありがとう、蓮です。\n写真より実物見てみたいって思った、ってのは早い？笑'},
-  r:{greet:['連絡待ってた。今日はどんな日だった？'],
-     tired:['おつかれ。頑張りすぎ。\n俺の前では甘えていいから。'],
-     work:['ちゃんと働いてるの尊敬する。俺も負けてられないな'],
-     love:['……それ、本気にするよ？\n俺も同じ気持ちだから。'],
-     meet:['会いたい。今日いるから、顔だけでも見せて？'],
-     food:['腹減ったな。終わったらラーメン行こ。うまいとこ知ってる'],
-     night:['もう寝る？…じゃあ最後に声だけ聞きたかったな。おやすみ'],
-     q:['君はどう思う？俺は君の答えが聞きたい'],
-     etc:['うん、それで？','そういうとこ、いいなって思う','笑った。ほんと面白いね','今なにしてるか、ちょっと気になってた']}},
- {id:'nagi', name:'凪', kana:'なぎ', job:'バーテンダー', store:'中崎町 Bar 凪', colors:['#5fd1c4','#1b4f5c'],
-  catch:'話すより聴く人。グラス越しの距離感。', status:'今夜も21時から。', tags:['落ち着き','聴き上手','お酒'],
-  tone:'落ち着いた男性バーテンダー。丁寧語。短く静かに返す。お酒や夜の比喩を時々使う。',
-  opens:{first:'今夜はご来店ありがとうございました。凪です。\n次は好みのカクテル、作らせてください。',
-         nanpa:'驚きました。カウンターの外で声をかけられるのは珍しいので。\n…よければ、話の続きを。',
-         match:'はじめまして、凪です。\nお酒は強いほうですか？'},
-  r:{greet:['こんばんは。今日は何を飲みたい気分ですか。'],
-     tired:['お疲れさまです。そういう夜は、温かい一杯がいいですよ。'],
-     work:['いろいろ抱えてますね。ここでは降ろしていってください。'],
-     love:['…光栄です。グラスを拭く手が止まりました。'],
-     meet:['今夜も21時から開けてます。いつもの席、空けておきますね。'],
-     food:['つまみならチーズとナッツ。シンプルなのが一番合います。'],
-     night:['おやすみなさい。いい夢を。'],
-     q:['難しい質問ですね。…あなたはどう思います？'],
-     etc:['なるほど。','それで、どうなったんです？','いい話ですね。少し羨ましい。','ゆっくりでいいですよ。聞いてます。']}},
- {id:'mao', name:'真央', kana:'まお', job:'ガールズバー', store:'京橋 Girls Bar Peach', colors:['#ff9a8b','#ff5470'],
-  catch:'サバサバ関西弁。ツッコミが速い。', status:'京橋おるで〜🍑', tags:['サバサバ','関西弁','ツッコミ'],
-  tone:'サバサバした関西弁の女の子。ツッコミ多め。照れると雑になる。相手を「あんた」と呼ぶこともある。',
-  opens:{first:'今日はありがとね〜！真央やで🍑\nめっちゃおもろかったわ、また来てな！',
-         nanpa:'ほんまにLINE聞いてくる人おるんや笑\nまあええけど！真央です、よろしく〜',
-         match:'マッチありがと！真央やで〜\nてか家どこらへん？京橋とか来る？'},
-  r:{greet:['おつ〜！なになに、ヒマなん？笑'],
-     tired:['おつかれやん！今日はもう何も考えんと寝とき'],
-     work:['仕事えらいなぁ。真央は今日もお酒作るだけやで笑'],
-     love:['はいはい、みんなに言うてるんやろ〜笑\n…でもまあ、ありがと'],
-     meet:['今日おるで！来るんやったら待ってるわ🍑'],
-     food:['たこ焼きは家で焼く派やねん。今度タコパしよや'],
-     night:['おやすみ〜！寝坊すんなよ〜'],
-     q:['え〜わからん笑 そっちはどうなん？'],
-     etc:['わかる〜！','ほんでほんで？','それはおもろいわ笑笑','あんたほんま変わってんなぁ笑']}},
-];
+const CHARS = Casts.list; // 定義は /casts.js が唯一の置き場（サーバーと共有）
 const charById = id => CHARS.find(c=>c.id===id);
 
 /* ---------- 2. STORE ---------- */
@@ -412,7 +331,7 @@ function applyEngineResult(fid,result,history,elapsedMs,mode){
   const f=friend(fid);
   if(f&&e.settings.flags.relationship!==false){
     const r=result.engineState.relationship||{};
-    f.aff=Math.min(100,Math.max(0,Math.round((r.closeness||0)*.55+(r.trust||0)*.25+(r.attraction||0)*.20)));
+    f.aff=Relation.affinityOf(r);
   }
   Backend.engineVersion=result.engineVersion||Backend.engineVersion;
   const input=history.filter(m=>m.from==='me').slice(-1)[0]?.text||'（自動メッセージ）';
@@ -441,7 +360,8 @@ function save(){
 function showAuthGate(message){
   let el=document.getElementById('auth-gate');
   if(!el){el=document.createElement('div');el.id='auth-gate';document.body.appendChild(el)}
-  el.innerHTML='<div class="auth-panel"><h3>yoruAIをはじめる</h3><p id="auth-info"></p>'+
+  el.dataset.mode=document.getElementById('app')?.dataset.mode||'light';
+  el.innerHTML='<div class="auth-panel"><div class="auth-logo" aria-hidden="true">夜</div><h3>yoruAIをはじめる</h3><p id="auth-info"></p>'+
     '<form id="auth-start"><input id="auth-name" type="text" required minlength="1" maxlength="12" autocomplete="nickname" placeholder="ユーザー名" aria-label="ユーザー名">'+
     '<button type="submit" id="auth-go">この名前ではじめる</button></form>'+
     '<small>メールアドレス・パスワード不要。専用IDを自動発行し、このブラウザにログイン情報を保存します。</small></div>';
@@ -939,6 +859,7 @@ function openProfile(fid){
     <div class="pf">${av(c,96)}<h2>${esc(c.name)}</h2><div class="job">${esc(c.job)}　${esc(c.store)}</div><p class="st">${esc(c.status)}</p></div>
     <div class="pf-panel">
       <div class="aff"><span class="lv">${LEVELS[lv].name}</span><span class="bar"><i style="width:${affPct(f)}%"></i></span><span class="nx">${nx?`${nx.name}まで ${nx.min-f.aff}`:'最大'}</span></div>
+      <p class="pf-note">${esc(Relation.note((actorState(fid)||{}).relationship||Relation.seed(f.meet)))}</p>
       <div class="pf-meta"><span>出会い方</span><span>${MEETS[f.meet].label}</span></div>
       <div class="acts"><button data-act="chat" data-id="${fid}">${IC.talk}トーク</button><button data-act="remeet" data-id="${c.id}">${IC.redo}出会い直す</button></div>
     </div>`;

@@ -53,3 +53,34 @@ test('structured response parser',()=>{
  assert.equal(r.structured,true);
 });
 console.log('All '+count+' engine tests passed.');
+
+test('meet decides initial relationship; saved state is never overwritten',()=>{
+  const R=require('../relation');
+  assert.deepEqual(E.initialState('mao').relationship,{closeness:10,trust:20,attraction:12,comfort:18,tension:0});
+  assert.deepEqual(E.initialState('mao',Date.now(),'first').relationship,E.initialState('mao').relationship);
+  const n=E.initialState('mao',Date.now(),'nanpa').relationship,m=E.initialState('mao',Date.now(),'match').relationship;
+  assert.ok(n.trust<20&&n.comfort<18,'nanpa starts guarded');
+  assert.ok(m.attraction>12,'match starts with more interest');
+  assert.deepEqual(E.initialState('mao',Date.now(),'bogus').relationship,E.initialState('mao').relationship);
+  assert.deepEqual(E.normalize(null,'rena',Date.now(),'nanpa').relationship,R.MEET_SEEDS.nanpa);
+  const saved=E.initialState('rena',Date.now(),'first');saved.relationship.closeness=55;
+  assert.equal(E.normalize(saved,'rena',Date.now(),'nanpa').relationship.closeness,55);
+  const p=E.build({charId:'mao',character:E.CASTS.mao,meet:'x',meetKey:'nanpa',userName:'a',userGender:'male',history:[{role:'user',text:'hi'}],mode:'chat',settings:{},state:null});
+  assert.ok(p&&JSON.stringify(p).length>100);
+});
+
+test('cast definitions are one source: client list == server casts, no drift',()=>{
+  const C=require('../casts');
+  const html=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','index.html'),'utf8');
+  assert.ok(!/const CHARS\s*=\s*\[/.test(html),'index.html must not redefine CHARS');
+  assert.deepEqual(Object.keys(E.CASTS),C.list.map(c=>c.id));
+  for(const c of C.list){assert.equal(E.CASTS[c.id].name,c.name);assert.ok(E.CASTS[c.id].tone&&E.CASTS[c.id].values,c.id+' has persona');}
+});
+
+test('relation.note describes bias, not just level',()=>{
+  const R=require('../relation');
+  assert.equal(R.note(R.seed('first')),'まだ知り合ったばかり');
+  assert.match(R.note({closeness:60,trust:20,attraction:30,comfort:50,tension:0}),/打ち解け.*信頼はまだ浅い/);
+  assert.match(R.note({closeness:40,trust:40,attraction:40,comfort:40,tension:15}),/わだかまり/);
+  assert.equal(R.note(null),'');
+});

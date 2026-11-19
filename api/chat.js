@@ -1,13 +1,5 @@
 // One authenticated Gemini call for reply and provisional state inference.
 const Engine=require('../lib/engine');
-const CASTS = {
-  kokoa: {name:'心愛',kana:'ここあ',job:'キャバ嬢',store:'北新地 Club LUNA',tone:'甘めのタメ口。語尾に「〜だよぉ」「♡」をよく使う。相手をたくさん褒める。寂しがり。たまにお店に誘う。'},
-  rena: {name:'玲奈',kana:'れな',job:'ラウンジ',store:'北新地 Lounge 月白',tone:'丁寧語ベースのクールな大人の女性。感情は控えめだが、時々本音がこぼれる。'},
-  yume: {name:'ゆめ',kana:'ゆめ',job:'コンカフェ',store:'日本橋 ねこみみ喫茶',tone:'元気なコンカフェキャスト。語尾に「にゃ」。相手を「{name}さま」と呼ぶ。テンション高め。'},
-  ren: {name:'蓮',kana:'れん',job:'ホスト',store:'ミナミ CLUB ARIA',tone:'優しく甘い王子系ホスト。相手を「君」と呼ぶ。まっすぐ好意を伝える。会いたがる。'},
-  nagi: {name:'凪',kana:'なぎ',job:'バーテンダー',store:'中崎町 Bar 凪',tone:'落ち着いた男性バーテンダー。丁寧語。短く静かに返す。お酒や夜の比喩を時々使う。'},
-  mao: {name:'真央',kana:'まお',job:'ガールズバー',store:'京橋 Girls Bar Peach',tone:'サバサバした関西弁の女の子。ツッコミ多め。照れると雑になる。相手を「あんた」と呼ぶこともある。'}
-};
 const MEETS = {
   first:'お店に初めて来たお客さんとしてLINEを交換した',
   nanpa:'街で偶然声をかけてLINEを交換した',
@@ -45,8 +37,8 @@ module.exports = async function handler(req, res) {
     if (throttle.size > 5000) throttle.clear();
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-    const cast = CASTS[body.charId];
-    const meet = MEETS[body.meet];
+    const cast = Object.hasOwn(Engine.CASTS, body.charId) ? Engine.CASTS[body.charId] : null;
+    const meet = Object.hasOwn(MEETS, body.meet) ? MEETS[body.meet] : null;
     const history = body.history;
     if (!cast || !meet || !Array.isArray(history) || (!body.initialGreeting && history.length < 1) ||
         history.length > 30) return res.status(400).json({error:'会話データが不正です'});
@@ -56,7 +48,7 @@ module.exports = async function handler(req, res) {
     const requested=body.engineSettings||{};
     const settings={flags:baseline?Object.fromEntries(Engine.FEATURES.map(k=>[k,false])):requested.flags,
       styleNote:baseline?'':String(requested.styleNote||'').slice(0,350)};
-    const context=Engine.build({charId:body.charId,character:cast,meet:MEETS[body.meet],userName:name,
+    const context=Engine.build({charId:body.charId,character:cast,meet:MEETS[body.meet],meetKey:body.meet,userName:name,
       userGender:body.userGender,history,initialGreeting:body.initialGreeting===true,
       mode,settings,state:body.engineState});
     const gender = body.userGender === 'female' ? '女性' : '男性';
