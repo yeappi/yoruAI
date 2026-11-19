@@ -2,9 +2,20 @@
 
 夜職AIキャストとLINE風に会話するプロトタイプ。既存のUIは `index.html` にあり、チャット生成はVercel Functions経由で行う。
 
+## 会話エンジン v1（開発中）
+
+**設定 → 会話ラボ** から、人格・関係性・気分・記憶・自発性の有効/無効を切り替えられる。
+同じ会話条件でA/B比較し、返信の良し悪しとモデル・設定の履歴を記録可能。
+
+実装の詳細と仮仕様、操作方法、制約は [ENGINE.md](./ENGINE.md) を参照。
+エンジンの純粋関数テストは `node tests/engine.test.cjs` で実行できる。
+
+
 ## 構成
 
 - `index.html`: 友だち追加・出会い方・トーク画面。Supabase Auth、クラウド同期のクライアント処理。固定返信モードは廃止し、初回挨拶もGeminiで生成
+- `lib/engine.js`: 5要素のコンテキスト、モデル応答のJSON解釈、状態更新
+- `lab-ui.js`: A/B比較・設定切替・返信評価・状態閲覧
 - `api/config.js`: 公開してよいSupabase URL / Publishable Keyをブラウザへ渡す
 - `api/chat.js`: Supabase Authトークンを検証し、Gemini APIでキャスト返信を生成する
 - Supabase `public.app_states`: 各ユーザーの現在の画面状態とトーク履歴をJSONBで保存（RLS有効）
