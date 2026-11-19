@@ -55,7 +55,7 @@ module.exports = async function handler(req, res) {
     const requested=body.engineSettings||{};
     const settings={flags:baseline?Object.fromEntries(Engine.FEATURES.map(k=>[k,false])):requested.flags,
       styleNote:baseline?'':String(requested.styleNote||'').slice(0,350)};
-    const context=Engine.build({charId:body.charId,meet:MEETS[body.meet],userName:name,
+    const context=Engine.build({charId:body.charId,character:cast,meet:MEETS[body.meet],userName:name,
       userGender:body.userGender,history,initialGreeting:body.initialGreeting===true,
       mode,settings,state:body.engineState});
     const gender = body.userGender === 'female' ? '女性' : '男性';
