@@ -28,7 +28,14 @@ function render(){
  if(!c)return;
  const rel=state?.relationship||{},m=state?.mood,cv=lab.comparison;
  const labels={closeness:'親しさ',trust:'信頼',attraction:'恋愛的好意',comfort:'気楽さ',tension:'わだかまり'};
- const recent=e.logs.filter(x=>x.fid===id).slice(0,5);
+ const all=e.logs.filter(x=>x.fid===id);
+ const recent=all.slice(0,5);
+ const ratings=all.filter(x=>x.rating!==0);
+ const upvotes=ratings.filter(x=>x.rating>0).length;
+ const questionRate=all.length?Math.round(all.filter(x=>/[?？]/.test(x.output)).length/all.length*100):0;
+ const avgLength=all.length?Math.round(all.reduce((sum,x)=>sum+x.output.length,0)/all.length):0;
+ const ab=e.evaluations.filter(x=>x.charId===id);
+ const bWins=ab.filter(x=>x.winner==='B').length;
  let html='<div class="lhd"><button class="ib" data-act="close-lab" aria-label="戻る">←</button>'+
    '<div class="ttl">会話ラボ<small>'+escLab(Backend.engineVersion)+' / 設定 v'+e.settings.revision+
    '</small></div><div style="width:44px"></div></div><div class="lab-body">';
@@ -67,6 +74,13 @@ function render(){
     '<button class="lab-small" data-act="lab-vote" data-id="tie">同等</button></div>';
  }
  html+='</div>';
+ html+='<div class="lab-panel"><h3>評価指標（'+escLab(c.name)+'）</h3>'+
+ '<div class="lab-score"><span>記録した返信</span><span>'+all.length+'件</span></div>'+
+ '<div class="lab-score"><span>評価済みの好評価率</span><span>'+(ratings.length?Math.round(upvotes/ratings.length*100)+'%':'未評価')+'</span></div>'+
+ '<div class="lab-score"><span>質問を含む返信率</span><span>'+questionRate+'%</span></div>'+
+ '<div class="lab-score"><span>平均返信文字数</span><span>'+avgLength+'文字</span></div>'+
+ '<div class="lab-score"><span>A/BでBが勝った回数</span><span>'+bWins+'/'+ab.length+'</span></div>'+
+ '<p>簡易指標です。自然さや恋愛感情の品質を直接測っているわけではありません。</p></div>';
  html+='<div class="lab-panel"><h3>返信ログの評価</h3>';
  html+=recent.length?recent.map(x=>
   '<div class="lab-trace"><small>'+new Date(x.at).toLocaleString('ja-JP')+'・'+escLab(x.model)+'・設定v'+x.revision+
@@ -83,7 +97,7 @@ function render(){
  el('#lab').innerHTML=html;
  el('#lab-cast').onchange=ev=>{lab.selected=ev.target.value;lab.comparison=null;render()};
  el('#lab-compare-form').onsubmit=ev=>{ev.preventDefault();compare()};
- el('#lab-style-note').oninput=ev=>{
+ el('#lab-style-note').onchange=ev=>{
   const e=ensureEngine();
   e.settings.styleNote=ev.target.value.slice(0,350);
   e.settings.revision+=1;
