@@ -8,6 +8,8 @@
 同じ会話条件でA/B比較し、返信の良し悪しとモデル・設定の履歴を記録可能。
 
 実装の詳細と仮仕様、操作方法、制約は [ENGINE.md](./ENGINE.md) を参照。
+
+既読・返信の時間制御、追いDMによる待機解除、連投の集約と障害時の振る舞いは [TIMING.md](./TIMING.md) を参照。テストは `node tests/timing.test.cjs` で実行。
 エンジンの純粋関数テストは `node tests/engine.test.cjs` で実行できる。
 
 
