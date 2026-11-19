@@ -3,256 +3,199 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
-<meta name="theme-color" content="#FFF4F6">
+<meta name="theme-color" content="#FFFFFF">
 <title>yoruAI</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-/* =========== TOKENS ===========
-   紅  #FF2E63  … テーマカラー（赤ピンク）
-   桃  #FF7AA2  … グラデーションの相方
-   臙脂 #5A0A26 … 名刺・夜の深い色
-   頬  #FFF4F6  … 背景（ライト）
-   墨  #2B0D17  … 文字
-*/
-:root{
-  --beni:#FF2E63;--momo:#FF7AA2;--enji:#5A0A26;
-  --grad:linear-gradient(135deg,#FF2E63 0%,#FF5B87 55%,#FF8FB1 100%);
-  --mincho:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif;
-  --goth:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
-  --ease:cubic-bezier(.2,.8,.2,1);
-}
+/* 色は1色だけ。赤ピンクはアクセント（自分の吹き出し・未読・送信・選択中）にだけ使う */
 [data-mode="light"]{
-  --bg:#FFF4F6;--bg2:#FFE6ED;--card:#FFFFFF;--ink:#2B0D17;--sub:#9A7380;--line:rgba(122,15,51,.10);
-  --glass:rgba(255,246,248,.72);--chat:#FFEFF3;--ai:#FFFFFF;--ai-ink:#2B0D17;
-  --shadow:0 14px 34px -16px rgba(122,15,51,.38);--shadow-s:0 4px 14px -6px rgba(122,15,51,.22);
+  --accent:#EE3A5D; --accent-press:#D62E50; --accent-soft:#FDECEF;
+  --bg:#FFFFFF; --group:#F3F3F5; --chat:#F1F1F4;
+  --text:#18181B; --sub:#8B8B93; --faint:#B9B9C0;
+  --hair:rgba(24,24,27,.09); --fill:#F1F1F3; --ai:#FFFFFF;
+  --bar:rgba(255,255,255,.94);
 }
 [data-mode="night"]{
-  --bg:#17080F;--bg2:#24101A;--card:#26121C;--ink:#FBEFF3;--sub:#A98793;--line:rgba(255,122,162,.13);
-  --glass:rgba(23,8,15,.72);--chat:#1A0A11;--ai:#2D1621;--ai-ink:#FBEFF3;
-  --shadow:0 14px 34px -14px rgba(0,0,0,.7);--shadow-s:0 4px 14px -6px rgba(0,0,0,.6);
+  --accent:#F5506F; --accent-press:#E23E5E; --accent-soft:rgba(245,80,111,.14);
+  --bg:#141416; --group:#0C0C0D; --chat:#0E0E10;
+  --text:#F2F2F4; --sub:#8E8E96; --faint:#5A5A61;
+  --hair:rgba(255,255,255,.09); --fill:#232327; --ai:#242428;
+  --bar:rgba(20,20,22,.94);
 }
+:root{--font:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",sans-serif;--ease:cubic-bezier(.25,.8,.25,1)}
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:#E9D9DE;font-family:var(--goth)}
-button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--beni);outline-offset:2px}
+html,body{height:100%;background:#E4E4E8;font-family:var(--font);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:inherit}
 input,textarea{font:inherit;color:inherit}
-#app{position:relative;width:100%;max-width:430px;height:100dvh;margin:0 auto;background:var(--bg);color:var(--ink);overflow:hidden;isolation:isolate}
-@media(min-width:500px){body{display:flex;align-items:center;justify-content:center}#app{height:min(900px,100dvh);border-radius:34px;box-shadow:0 40px 80px -30px rgba(90,10,38,.45)}}
-/* 背景の灯り */
-#app::before{content:"";position:absolute;width:420px;height:420px;top:-210px;right:-160px;border-radius:50%;background:radial-gradient(circle,rgba(255,46,99,.22),transparent 65%);z-index:-1;pointer-events:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#app{position:relative;width:100%;max-width:430px;height:100dvh;margin:0 auto;background:var(--bg);color:var(--text);overflow:hidden;font-size:15px;line-height:1.45}
+@media(min-width:500px){body{display:flex;align-items:center;justify-content:center}#app{height:min(880px,100dvh);border-radius:24px;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 30px 60px -30px rgba(0,0,0,.35)}}
 
-/* =========== TAB SCREENS =========== */
-#tab{position:absolute;inset:0;overflow-y:auto;padding-bottom:110px;-webkit-overflow-scrolling:touch}
-.hd{display:flex;align-items:flex-end;gap:10px;padding:22px 20px 14px;padding-top:max(22px,env(safe-area-inset-top))}
-.hd h1{flex:1;font-family:var(--mincho);font-weight:800;font-size:30px;letter-spacing:.04em;line-height:1}
-.fab{width:44px;height:44px;border-radius:50%;background:var(--grad);color:#fff;display:grid;place-items:center;box-shadow:0 10px 22px -8px rgba(255,46,99,.75)}
-.fab svg{width:22px;height:22px}
-.fab:active{transform:scale(.94)}
-.sec{display:flex;align-items:baseline;gap:8px;padding:22px 20px 12px}
-.sec h2{font-family:var(--mincho);font-size:17px;font-weight:800}
-.sec span{font-size:12px;color:var(--sub)}
+/* ---------- 共通 ---------- */
+#tab{position:absolute;inset:0 0 calc(56px + env(safe-area-inset-bottom)) 0;overflow-y:auto}
+.hd{position:sticky;top:0;z-index:3;display:flex;align-items:center;height:52px;padding:0 8px 0 20px;margin-top:env(safe-area-inset-top);background:var(--bg)}
+.hd h1{flex:1;font-size:21px;font-weight:700;letter-spacing:.01em}
+.ib{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--text)}
+.ib svg{width:24px;height:24px}
+.ib:active{background:var(--fill)}
+.av{width:var(--s);height:var(--s);border-radius:36%;flex-shrink:0;display:grid;place-items:center;background:var(--tb);color:var(--tf);font-weight:600;font-size:calc(var(--s)*.4)}
+[data-mode="night"] .av{filter:saturate(.85) brightness(.9)}
+.av.me{--tb:#E7E7EB;--tf:#6B6B73}
+.sec{display:flex;justify-content:space-between;align-items:center;padding:20px 20px 6px;font-size:13px;color:var(--sub)}
+.sec b{font-weight:500}
+
+/* 行 */
+.row{display:flex;align-items:center;gap:14px;width:100%;padding:8px 20px;min-height:62px}
+.row:active{background:var(--fill)}
+.row .tx{flex:1;min-width:0}
+.row .t1{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .t2{font-size:13px;color:var(--sub);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{height:30px;padding:0 14px;border-radius:15px;background:var(--fill);font-size:13px;font-weight:600;flex-shrink:0}
+.chip:active{background:var(--hair)}
 
 /* 自分 */
-.mycard{margin:0 16px;display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:22px;background:var(--card);box-shadow:var(--shadow-s);text-align:left;width:calc(100% - 32px)}
-.mycard .nm{font-weight:700;font-size:16px}
-.mycard .st{font-size:12px;color:var(--sub);margin-top:3px}
-.mycard .gd{font-size:11px;font-weight:700;color:var(--beni);background:rgba(255,46,99,.1);padding:3px 9px;border-radius:20px;margin-left:auto;flex-shrink:0}
-
-/* 印（アバター） */
-.seal{width:var(--s);height:var(--s);border-radius:50%;flex-shrink:0;display:grid;place-items:center;color:#fff;font-family:var(--mincho);font-weight:800;font-size:calc(var(--s)*.44);
-  background:radial-gradient(circle at 32% 28%,var(--c1),var(--c2) 78%);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35),0 6px 14px -6px var(--c2);position:relative}
-.seal.me{--c1:#ffd0dc;--c2:#c98a9b}
-.seal.ring::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--beni)}
-
-/* =========== 名刺 =========== */
-.ms{--c1:#ff8fb1;--c2:#5a0a26;position:relative;width:100%;aspect-ratio:91/55;border-radius:16px;color:#fff;overflow:hidden;text-align:left;
-  background:radial-gradient(120% 120% at 100% 0%,var(--c1) 0%,transparent 58%),linear-gradient(160deg,var(--c2) 10%,#1b0710 100%);
-  box-shadow:0 18px 36px -18px rgba(43,13,23,.65),inset 0 1px 0 rgba(255,255,255,.25)}
-.ms::before{content:"";position:absolute;inset:9px;border:1px solid rgba(255,255,255,.22);border-radius:10px;pointer-events:none}
-.ms::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.10) 50%,transparent 60%);pointer-events:none}
-.ms-in{position:absolute;inset:0;padding:20px 22px;display:flex;flex-direction:column}
-.ms-row{display:flex;align-items:center;gap:10px}
-.ms-name{font-family:var(--mincho);font-weight:800;font-size:26px;letter-spacing:.08em;line-height:1}
-.ms-kana{font-size:11px;opacity:.75;letter-spacing:.12em}
-.ms-lv{margin-left:auto;font-size:10px;font-weight:700;padding:4px 9px;border-radius:20px;background:rgba(255,255,255,.16);backdrop-filter:blur(6px)}
-.ms-store{font-size:11.5px;opacity:.85;margin-top:9px;letter-spacing:.04em}
-.ms-catch{margin-top:auto;font-size:12px;line-height:1.55;opacity:.9;max-width:72%}
-.ms-hanko{position:absolute;right:20px;bottom:18px;width:46px;height:46px;border-radius:50%;border:2px solid rgba(255,255,255,.75);display:grid;place-items:center;font-family:var(--mincho);font-weight:800;font-size:22px;color:#fff;transform:rotate(-12deg);background:rgba(255,46,99,.35)}
-
-/* 名刺入れ（重なり） */
-.wallet{padding:4px 16px 0;display:flex;flex-direction:column}
-.wallet .ms{transition:transform .3s var(--ease)}
-.wallet .ms + .ms{margin-top:calc(-60.44% + 82px)}
-.wallet .ms:active{transform:translateY(-6px)}
-.wallet .ms:last-child{margin-bottom:0}
-.wallet-empty{margin:0 16px;aspect-ratio:91/55;border-radius:16px;border:1.5px dashed rgba(255,46,99,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;color:var(--sub);font-size:13px;line-height:1.6;background:repeating-linear-gradient(-45deg,transparent 0 10px,rgba(255,46,99,.035) 10px 20px)}
-.pill{height:40px;padding:0 20px;border-radius:20px;background:var(--grad);color:#fff;font-weight:700;font-size:14px;box-shadow:0 10px 22px -10px rgba(255,46,99,.8)}
-
-/* まだ会っていない */
-.reco{display:flex;gap:12px;overflow-x:auto;padding:2px 16px 8px;scroll-snap-type:x mandatory;scrollbar-width:none}
-.reco::-webkit-scrollbar{display:none}
-.reco-c{flex:0 0 132px;scroll-snap-align:start;text-align:center;border-radius:20px;padding:16px 10px 12px;background:var(--card);box-shadow:var(--shadow-s);position:relative;overflow:hidden}
-.reco-c::before{content:"";position:absolute;left:0;right:0;top:0;height:46px;background:linear-gradient(160deg,var(--c1),var(--c2));opacity:.9}
-.reco-c .seal{margin:6px auto 8px;box-shadow:0 0 0 3px var(--card),0 8px 16px -8px var(--c2)}
-.reco-c b{display:block;font-family:var(--mincho);font-size:16px}
-.reco-c small{display:block;font-size:11px;color:var(--sub);margin-top:2px}
-.reco-c .add{margin-top:10px;font-size:11.5px;font-weight:700;color:var(--beni);border:1.5px solid rgba(255,46,99,.35);border-radius:16px;padding:5px 0}
+.mine{display:flex;align-items:center;gap:16px;padding:10px 20px 18px;width:100%;border-bottom:1px solid var(--hair)}
+.mine .t1{font-size:18px;font-weight:700}
+.mine .t2{font-size:13px;color:var(--sub);margin-top:2px}
 
 /* トーク一覧 */
-.tlist{margin:0 16px;border-radius:24px;background:var(--card);box-shadow:var(--shadow-s);overflow:hidden}
-.trow{display:flex;align-items:center;gap:13px;padding:13px 16px;width:100%;text-align:left;position:relative}
-.trow + .trow::before{content:"";position:absolute;top:0;left:78px;right:16px;border-top:1px solid var(--line)}
-.trow:active{background:var(--bg2)}
-.trow .tx{flex:1;min-width:0}
-.trow .nm{font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px}
-.trow .nm small{font-size:10.5px;color:var(--sub);font-weight:500}
-.trow .pv{font-size:13px;color:var(--sub);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.trow .pv.on{color:var(--ink);font-weight:500}
-.trow .pv.typ{color:var(--beni)}
-.trow .rt{display:flex;flex-direction:column;align-items:flex-end;gap:7px;align-self:stretch;padding-top:2px}
-.trow .tm{font-size:11px;color:var(--sub)}
-.ub{min-width:21px;height:21px;padding:0 6px;border-radius:11px;background:var(--grad);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
-.blank{margin:10px 16px;padding:38px 24px;border-radius:24px;background:var(--card);text-align:center;box-shadow:var(--shadow-s)}
-.blank p{font-size:13.5px;color:var(--sub);line-height:1.7;margin:6px 0 18px}
-.blank b{font-family:var(--mincho);font-size:18px}
+.trow{min-height:76px;padding:10px 20px}
+.trow .av{--s:52px}
+.trow .top{display:flex;align-items:baseline;gap:8px}
+.trow .top .t1{flex:1}
+.trow .tm{font-size:12px;color:var(--sub);flex-shrink:0}
+.trow .bot{display:flex;align-items:center;gap:8px;margin-top:3px}
+.trow .bot .t2{flex:1;margin:0;font-size:14px}
+.trow .bot .t2.typ{color:var(--accent)}
+.ub{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--accent);color:#fff;font-size:12px;font-weight:600;display:grid;place-items:center;flex-shrink:0}
+.empty{padding:90px 40px 0;text-align:center}
+.empty b{display:block;font-size:17px;font-weight:600}
+.empty p{font-size:14px;color:var(--sub);margin:8px 0 22px;line-height:1.6}
+.btn{height:50px;padding:0 28px;border-radius:12px;background:var(--accent);color:#fff;font-size:16px;font-weight:600}
+.btn:active{background:var(--accent-press)}
+.btn.wide{width:100%}
+.btn.line{background:var(--fill);color:var(--text)}
 
 /* 設定 */
-.grp{margin:0 16px;border-radius:22px;background:var(--card);box-shadow:var(--shadow-s);overflow:hidden}
-.fld{padding:14px 16px;position:relative}
-.fld + .fld::before{content:"";position:absolute;top:0;left:16px;right:16px;border-top:1px solid var(--line)}
-.fld label{display:block;font-size:12px;color:var(--sub);margin-bottom:8px}
-.fld input{width:100%;border:0;outline:0;background:transparent;font-size:15.5px}
-.seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--bg2)}
-.seg button{flex:1;padding:9px 0;border-radius:10px;font-size:13px;font-weight:700;color:var(--sub);transition:all .2s}
-.seg button.on{background:var(--card);color:var(--beni);box-shadow:var(--shadow-s)}
-.note{font-size:11.5px;color:var(--sub);padding:8px 22px 0;line-height:1.65}
-.danger{width:100%;text-align:left;padding:15px 16px;color:#E0244F;font-weight:700;font-size:14px}
+.set{background:var(--group);min-height:100%}
+.set .hd{background:var(--group)}
+.grp{margin:0 16px;border-radius:12px;background:var(--bg);overflow:hidden}
+.cell{display:flex;align-items:center;gap:12px;min-height:50px;padding:0 16px;position:relative}
+.cell + .cell::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:1px solid var(--hair)}
+.cell label{flex-shrink:0;width:92px;font-size:15px}
+.cell input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:15px;text-align:right;color:var(--sub)}
+.cell input:focus{color:var(--text)}
+.cell .sp{flex:1}
+.seg{display:flex;padding:2px;border-radius:9px;background:var(--fill)}
+.seg button{min-width:64px;height:30px;padding:0 12px;border-radius:7px;font-size:13px;font-weight:600;color:var(--sub)}
+.seg button.on{background:var(--bg);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+[data-mode="night"] .seg button.on{background:#3A3A3F}
+.foot{font-size:12px;color:var(--sub);padding:8px 32px 0;line-height:1.6}
+.danger{width:100%;min-height:50px;padding:0 16px;color:#E5484D;font-size:15px;text-align:left}
 
-/* =========== NAV（浮く） =========== */
-#nav{position:absolute;left:16px;right:16px;bottom:max(14px,env(safe-area-inset-bottom));z-index:10;display:flex;padding:6px;border-radius:26px;background:var(--glass);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);box-shadow:var(--shadow),inset 0 0 0 1px var(--line)}
-#nav button{flex:1;height:52px;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10.5px;font-weight:700;color:var(--sub);position:relative;transition:color .2s}
-#nav button svg{width:23px;height:23px}
-#nav button.on{color:#fff;background:var(--grad);box-shadow:0 8px 18px -8px rgba(255,46,99,.9)}
-.nb{position:absolute;top:5px;left:calc(50% + 7px);min-width:17px;height:17px;padding:0 5px;border-radius:9px;background:var(--beni);color:#fff;font-size:10px;display:grid;place-items:center;box-shadow:0 0 0 2px var(--bg)}
-#nav button.on .nb{background:#fff;color:var(--beni)}
+/* ---------- タブバー ---------- */
+#nav{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;padding-bottom:env(safe-area-inset-bottom);background:var(--bar);border-top:1px solid var(--hair);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+#nav button{flex:1;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;font-weight:600;color:var(--faint);position:relative}
+#nav button svg{width:25px;height:25px}
+#nav button.on{color:var(--text)}
+.nb{position:absolute;top:5px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:#fff;font-size:11px;display:grid;place-items:center;box-shadow:0 0 0 2px var(--bg)}
 
-/* =========== LAYERS =========== */
-.layer{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;background:var(--bg);visibility:hidden;transform:translateX(100%);transition:transform .32s var(--ease),visibility 0s .32s}
-.layer.open{visibility:visible;transform:none;transition:transform .32s var(--ease)}
+/* ---------- レイヤー ---------- */
+.layer{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;background:var(--bg);visibility:hidden;transform:translateX(100%);transition:transform .3s var(--ease),visibility 0s .3s}
+.layer.open{visibility:visible;transform:none;transition:transform .3s var(--ease)}
 .layer.up{transform:translateY(100%)}
 .layer.up.open{transform:none}
-.ib{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}
-.ib svg{width:22px;height:22px}
-.ib:active{background:var(--line)}
+@media(prefers-reduced-motion:reduce){.layer,.layer.open{transition:none}}
+.lhd{display:flex;align-items:center;height:52px;padding:0 4px;margin-top:env(safe-area-inset-top);flex-shrink:0;background:var(--bg);border-bottom:1px solid var(--hair)}
+.lhd .ttl{flex:1;text-align:center;font-size:16px;font-weight:600;min-width:0}
+.lhd .ttl small{display:block;font-size:11px;font-weight:400;color:var(--sub);margin-top:1px}
 
-/* =========== CHAT =========== */
+/* ---------- トークルーム ---------- */
 #chat{background:var(--chat)}
-#chat::before{content:"";position:absolute;inset:0;background:radial-gradient(80% 50% at 100% 0%,rgba(255,46,99,.10),transparent 70%),radial-gradient(70% 40% at 0% 100%,rgba(255,122,162,.12),transparent 70%);pointer-events:none}
-.c-hd{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;gap:6px;padding:10px 10px 10px 6px;padding-top:max(10px,env(safe-area-inset-top));background:var(--glass);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);border-bottom:1px solid var(--line)}
-.c-who{flex:1;display:flex;align-items:center;gap:10px;min-width:0;text-align:left}
-.c-who .nm{font-family:var(--mincho);font-weight:800;font-size:17px;letter-spacing:.04em}
-.c-who .lv{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--sub);margin-top:3px}
-.c-who .lv i{display:block;width:54px;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
-.c-who .lv i b{display:block;height:100%;background:var(--grad);border-radius:2px;transition:width .5s var(--ease)}
-#msgs{flex:1;overflow-y:auto;padding:78px 14px 96px;position:relative}
-.dsep,.sys{text-align:center;margin:16px 0 8px}
-.dsep span{font-size:11px;color:var(--sub);padding:4px 12px;border-radius:20px;background:var(--glass);box-shadow:inset 0 0 0 1px var(--line)}
-.sys span{font-size:11.5px;font-weight:700;color:var(--beni);padding:6px 14px;border-radius:20px;background:rgba(255,46,99,.09);box-shadow:inset 0 0 0 1px rgba(255,46,99,.2)}
-.m{display:flex;gap:8px;margin-top:4px;align-items:flex-end}
+#chat .lhd{background:var(--bar);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+#msgs{flex:1;overflow-y:auto;padding:8px 12px 16px}
+.dsep{text-align:center;margin:18px 0 10px}
+.dsep span{font-size:11px;color:var(--sub);padding:3px 10px;border-radius:10px;background:rgba(0,0,0,.05)}
+[data-mode="night"] .dsep span{background:rgba(255,255,255,.06)}
+.sys{text-align:center;margin:10px 0;font-size:12px;color:var(--sub)}
+.sys.up{color:var(--accent);font-weight:600}
+.m{display:flex;gap:8px;margin-top:3px;align-items:flex-end}
 .m.first{margin-top:12px}
-.m.ai .aw{width:34px;flex-shrink:0;align-self:flex-start}
-.m.ai .col{max-width:74%;display:flex;flex-direction:column;align-items:flex-start}
+.m.ai .aw{width:36px;flex-shrink:0;align-self:flex-start}
+.m.ai .col{min-width:0;max-width:72%}
+.m.ai .nm{font-size:12px;color:var(--sub);margin:0 0 4px 2px}
 .m.ai .bw{display:flex;align-items:flex-end;gap:6px}
 .m.me{justify-content:flex-end}
-.b{padding:9px 14px;font-size:15px;line-height:1.55;white-space:pre-wrap;word-break:break-word;border-radius:20px}
-.m.ai .b{background:var(--ai);color:var(--ai-ink);box-shadow:var(--shadow-s)}
-.m.ai.first .b{border-top-left-radius:6px}
-.m.me .b{background:var(--grad);color:#fff;max-width:74%;box-shadow:0 8px 18px -10px rgba(255,46,99,.8)}
-.m.me.first .b{border-top-right-radius:6px}
-.meta{font-size:10px;color:var(--sub);display:flex;flex-direction:column;align-items:flex-end;line-height:1.35;flex-shrink:0;padding-bottom:2px}
+.b{padding:8px 13px;font-size:15px;line-height:1.5;white-space:pre-wrap;word-break:break-word;border-radius:18px}
+.m.ai .b{background:var(--ai);color:var(--text)}
+[data-mode="light"] .m.ai .b{box-shadow:0 0 0 .5px rgba(0,0,0,.06)}
+.m.me .b{background:var(--accent);color:#fff;max-width:72%}
+.meta{font-size:10px;color:var(--sub);line-height:1.3;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;padding-bottom:1px}
 .m.ai .meta{align-items:flex-start}
-.meta .rd{color:var(--beni);font-weight:700}
-.typing .b{display:flex;gap:4px;padding:14px 16px}
-.typing i{width:6px;height:6px;border-radius:50%;background:var(--momo);animation:tp 1.2s infinite}
+.typing .b{display:flex;gap:4px;padding:13px 14px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--faint);animation:tp 1.2s infinite}
 .typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
-@keyframes tp{0%,60%,100%{transform:none;opacity:.45}30%{transform:translateY(-4px);opacity:1}}
-.c-in{position:absolute;left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));z-index:2;display:flex;align-items:flex-end;gap:6px;padding:6px 6px 6px 16px;border-radius:26px;background:var(--glass);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);box-shadow:var(--shadow),inset 0 0 0 1px var(--line)}
-.c-in textarea{flex:1;resize:none;border:0;outline:0;background:transparent;padding:9px 0;font-size:15px;line-height:1.4;max-height:110px}
-.c-in textarea:focus-visible{outline:0}
-.send{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--sub);background:var(--line);transition:all .2s}
-.send.on{background:var(--grad);color:#fff;box-shadow:0 8px 16px -8px rgba(255,46,99,.9)}
-.send svg{width:20px;height:20px}
+@keyframes tp{0%,60%,100%{opacity:.35}30%{opacity:1}}
+.cin{display:flex;align-items:flex-end;gap:8px;padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--hair);flex-shrink:0}
+.cin textarea{flex:1;resize:none;border:0;outline:0;border-radius:19px;background:var(--fill);padding:9px 14px;font-size:15px;line-height:1.35;max-height:110px}
+.send{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--faint);flex-shrink:0}
+.send.on{color:var(--accent)}
+.send svg{width:24px;height:24px}
 
-/* =========== PROFILE =========== */
-#profile{background:var(--bg)}
-.pf-top{position:relative;padding:max(12px,env(safe-area-inset-top)) 12px 0;height:330px;flex-shrink:0;
-  background:radial-gradient(90% 80% at 80% 10%,var(--c1),transparent 70%),linear-gradient(170deg,var(--c2),#1b0710)}
-.pf-top .ib{color:#fff;position:relative;z-index:2}
-.pf-top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:90px;background:linear-gradient(to bottom,transparent,var(--bg))}
-.pf-card{position:absolute;left:34px;right:34px;top:78px;z-index:1;transform:rotate(-4deg);animation:deal .55s var(--ease) both}
-@keyframes deal{from{transform:translateY(40px) rotate(4deg);opacity:0}to{transform:rotate(-4deg);opacity:1}}
-@media(prefers-reduced-motion:reduce){.pf-card{animation:none}}
-.pf-body{flex:1;overflow-y:auto;padding:12px 20px 30px;position:relative;z-index:1}
-.pf-st{font-family:var(--mincho);font-size:16px;line-height:1.7;text-align:center;padding:6px 10px 2px}
-.tags{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
-.tags span{font-size:12px;padding:5px 12px;border-radius:20px;background:var(--card);color:var(--ink);box-shadow:var(--shadow-s)}
-.aff{margin-top:20px;padding:16px 18px;border-radius:22px;background:var(--card);box-shadow:var(--shadow-s)}
-.aff-t{display:flex;justify-content:space-between;align-items:baseline}
-.aff-t b{font-family:var(--mincho);font-size:20px;color:var(--beni)}
-.aff-t span{font-size:12px;color:var(--sub)}
-.aff-bar{height:8px;border-radius:4px;background:var(--bg2);margin:12px 0 10px;overflow:hidden}
-.aff-bar i{display:block;height:100%;border-radius:4px;background:var(--grad);transition:width .6s var(--ease)}
-.aff-steps{display:flex;justify-content:space-between;font-size:10.5px;color:var(--sub)}
-.aff-steps .on{color:var(--beni);font-weight:700}
-.aff-meet{font-size:12px;color:var(--sub);margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
-.pf-acts{display:flex;gap:10px;margin-top:16px}
-.pf-acts button{flex:1;height:52px;border-radius:18px;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px}
-.pf-acts svg{width:20px;height:20px}
-.pf-acts .pri{background:var(--grad);color:#fff;box-shadow:0 12px 24px -12px rgba(255,46,99,.9)}
-.pf-acts .sec2{flex:0 0 auto;padding:0 18px;background:var(--card);box-shadow:var(--shadow-s);font-size:13px}
+/* ---------- プロフィール ---------- */
+#profile{background:var(--tb)}
+[data-mode="night"] #profile{background:#1E1E22}
+#profile .lhd{background:transparent;border:0}
+.pf{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 24px 8px;text-align:center}
+.pf .av{box-shadow:0 0 0 4px var(--bg)}
+.pf h2{font-size:22px;font-weight:700;margin-top:16px}
+.pf .job{font-size:13px;color:var(--sub);margin-top:4px}
+.pf .st{font-size:14px;margin-top:14px;line-height:1.6;color:var(--text);opacity:.85}
+.pf-panel{background:var(--bg);border-radius:20px 20px 0 0;padding:20px 20px max(20px,env(safe-area-inset-bottom))}
+.aff{display:flex;align-items:center;gap:12px;font-size:13px}
+.aff .lv{font-weight:700;color:var(--accent);flex-shrink:0}
+.aff .bar{flex:1;height:4px;border-radius:2px;background:var(--fill);overflow:hidden}
+.aff .bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
+.aff .nx{color:var(--sub);flex-shrink:0;font-size:12px}
+.pf-meta{display:flex;justify-content:space-between;font-size:13px;color:var(--sub);padding:14px 0 18px;border-bottom:1px solid var(--hair)}
+.pf-meta span:last-child{color:var(--text)}
+.acts{display:flex;justify-content:center;gap:48px;padding-top:16px}
+.acts button{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--text);min-width:64px}
+.acts svg{width:26px;height:26px}
 
-/* =========== ADD（いつも夜色） =========== */
-#add{background:#1A0910;color:#FBEFF3}
-#add::before{content:"";position:absolute;inset:0;background:radial-gradient(70% 45% at 50% 22%,var(--glow,rgba(255,46,99,.35)),transparent 70%);transition:background .4s;pointer-events:none}
-.a-hd{display:flex;align-items:center;padding:max(10px,env(safe-area-inset-top)) 8px 0;position:relative}
-.a-hd h1{flex:1;text-align:center;font-family:var(--mincho);font-size:18px;font-weight:800;letter-spacing:.06em}
-.a-hd .ib{color:#fff}
-.a-body{flex:1;overflow-y:auto;position:relative}
-.cards{display:flex;gap:14px;overflow-x:auto;padding:26px 44px 18px;scroll-snap-type:x mandatory;scrollbar-width:none}
+/* ---------- 友だち追加 ---------- */
+#add .body{flex:1;overflow-y:auto;padding-bottom:12px}
+.cards{display:flex;gap:12px;overflow-x:auto;padding:20px 32px 8px;scroll-snap-type:x mandatory;scroll-padding:0 32px;scrollbar-width:none}
 .cards::-webkit-scrollbar{display:none}
-.cards .ms{flex:0 0 100%;scroll-snap-align:center;transition:transform .35s var(--ease),opacity .35s}
-.cards .ms.off{transform:scale(.9) rotate(3deg);opacity:.45}
-.cards .ms.on{transform:rotate(-2deg)}
-.got{position:absolute;top:18px;right:58px;z-index:2;font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:20px;background:#fff;color:var(--beni)}
-.a-info{text-align:center;padding:0 28px;min-height:64px}
-.a-info .tags span{background:rgba(255,255,255,.08);color:#FBEFF3;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
-.dots{display:flex;gap:6px;justify-content:center;margin:16px 0 4px}
-.dots i{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.2);transition:all .25s}
-.dots i.on{width:20px;background:var(--grad)}
-.a-q{font-family:var(--mincho);font-size:16px;font-weight:800;text-align:center;margin:22px 0 12px}
-.meets{display:flex;gap:8px;padding:0 16px}
-.meet{flex:1;padding:14px 6px 12px;border-radius:20px;background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;gap:6px;transition:all .2s}
-.meet .mi{font-size:26px;line-height:1}
-.meet b{font-size:12.5px}
-.meet.on{background:rgba(255,46,99,.18);box-shadow:inset 0 0 0 1.5px var(--beni)}
-.meet-d{text-align:center;font-size:12.5px;color:#C9A9B5;margin:12px 0 6px;min-height:18px}
-.a-foot{padding:12px 16px max(14px,env(safe-area-inset-bottom));position:relative}
-.big{width:100%;height:56px;border-radius:20px;background:var(--grad);color:#fff;font-weight:700;font-size:16px;box-shadow:0 16px 30px -14px rgba(255,46,99,1)}
-.big:active{transform:scale(.98)}
-.big.warn{background:#fff;color:var(--beni)}
+.card{flex:0 0 100%;scroll-snap-align:center;border-radius:16px;background:var(--bg);box-shadow:0 0 0 1px var(--hair),0 8px 24px -16px rgba(0,0,0,.3);overflow:hidden;transition:opacity .25s}
+.card.off{opacity:.45}
+.card .cv{height:150px;background:var(--tb);display:grid;place-items:center;position:relative}
+.card .cv .av{box-shadow:0 0 0 3px rgba(255,255,255,.7)}
+.card .got{position:absolute;top:12px;right:12px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:10px;background:var(--bg);color:var(--sub)}
+.card .ci{padding:16px 18px 18px}
+.card h3{font-size:19px;font-weight:700}
+.card .job{font-size:13px;color:var(--sub);margin-top:2px}
+.card .cp{font-size:14px;line-height:1.6;margin-top:12px}
+.card .tg{font-size:12px;color:var(--sub);margin-top:10px}
+.dots{display:flex;gap:6px;justify-content:center;margin:8px 0 0}
+.dots i{width:6px;height:6px;border-radius:50%;background:var(--hair)}
+.dots i.on{background:var(--text)}
+.meet-sec{padding:26px 20px 0}
+.meet-sec h4{font-size:13px;font-weight:500;color:var(--sub);margin-bottom:10px}
+.seg.full{display:flex}
+.seg.full button{flex:1;height:36px}
+.meet-d{font-size:13px;color:var(--sub);margin-top:10px;line-height:1.6}
+.add-ft{padding:10px 20px max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--hair);flex-shrink:0}
 
-/* =========== BANNER / TOAST =========== */
-#banner{position:absolute;top:max(10px,env(safe-area-inset-top));left:10px;right:10px;z-index:50;display:flex;gap:11px;align-items:center;padding:11px 14px 11px 11px;border-radius:22px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);box-shadow:var(--shadow),inset 0 0 0 1px var(--line);transform:translateY(-150%);transition:transform .45s cubic-bezier(.2,.9,.3,1.15);cursor:pointer;text-align:left;color:var(--ink)}
+/* ---------- 通知・トースト ---------- */
+#banner{position:absolute;top:calc(8px + env(safe-area-inset-top));left:8px;right:8px;z-index:50;display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;background:var(--bar);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 0 0 1px var(--hair),0 12px 30px -12px rgba(0,0,0,.3);color:var(--text);transform:translateY(-140%);transition:transform .35s var(--ease)}
 #banner.show{transform:none}
 #banner .tx{flex:1;min-width:0}
-#banner .tx div{display:flex;justify-content:space-between;font-size:13px}
-#banner .tx small{font-size:10.5px;color:var(--sub)}
-#banner p{font-size:13px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
-#toast{position:absolute;left:50%;bottom:104px;z-index:60;transform:translate(-50%,16px);opacity:0;padding:11px 20px;border-radius:22px;background:#2B0D17;color:#fff;font-size:13px;font-weight:700;white-space:nowrap;transition:all .3s var(--ease);pointer-events:none;box-shadow:0 12px 26px -12px rgba(43,13,23,.8)}
-#toast.show{opacity:1;transform:translate(-50%,0)}
+#banner .l1{display:flex;justify-content:space-between;font-size:14px;font-weight:600}
+#banner .l1 small{font-size:12px;font-weight:400;color:var(--sub)}
+#banner p{font-size:14px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#toast{position:absolute;left:50%;bottom:calc(76px + env(safe-area-inset-bottom));z-index:60;transform:translateX(-50%);opacity:0;padding:10px 16px;border-radius:10px;background:rgba(24,24,27,.9);color:#fff;font-size:13px;white-space:nowrap;transition:opacity .2s;pointer-events:none}
+#toast.show{opacity:1}
 </style>
 </head>
 <body>
@@ -262,18 +205,18 @@ input,textarea{font:inherit;color:inherit}
   <section id="chat" class="layer"></section>
   <section id="profile" class="layer up"></section>
   <section id="add" class="layer up"></section>
-  <button id="banner" aria-live="polite"></button>
+  <button id="banner"></button>
   <div id="toast" role="status"></div>
 </div>
 
 <script>
 /* =========================================================
-   yoruAI — デザイン/プロトタイプ版（1ファイル）
+   yoruAI — プロトタイプ（1ファイル）
    1. DATA    … キャラ(CHARS)・出会い方(MEETS)・親密度(LEVELS)・性別(GENDERS)
    2. STORE   … localStorage 保存
    3. AI      … generateReply() が唯一の窓口。mock / gemini 切替
    4. CHAT    … 送信→既読→入力中→返信 のフロー
-   5. VIEWS   … ホーム(名刺入れ) / トーク / 設定 / トークルーム / プロフィール / 友だち追加
+   5. VIEWS   … ホーム / トーク / 設定 / トークルーム / プロフィール / 友だち追加
    ========================================================= */
 
 /* ---------- 1. DATA ---------- */
@@ -512,47 +455,45 @@ function addFriend(charId, meet){
 }
 
 /* ---------- 5. VIEWS ---------- */
+// アバターの色：彩度を落とした地色＋同系の濃い文字色
+const TONES = {kokoa:['#F7DCE2','#B23A57'], rena:['#DFE3EC','#3F4B68'], yume:['#F6E9CF','#8E6420'],
+               ren:['#E4E0F2','#4F4290'], nagi:['#D8EAE7','#2E6660'], mao:['#F6E0D8','#A1482D']};
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const cv = c => `--c1:${c.colors[0]};--c2:${c.colors[1]}`;
-const seal = (c,s,ring) => `<span class="seal${ring?' ring':''}" style="--s:${s}px;${cv(c)}">${esc(c.name[0])}</span>`;
-const meSeal = s => `<span class="seal me" style="--s:${s}px">${esc((S.me.name||'あ')[0])}</span>`;
+const tv = c => `--tb:${TONES[c.id][0]};--tf:${TONES[c.id][1]}`;
+const av = (c,s) => `<span class="av" style="--s:${s}px;${tv(c)}">${esc(c.name[0])}</span>`;
+const meAv = s => `<span class="av me" style="--s:${s}px">${esc((S.me.name||'あ')[0])}</span>`;
 const hhmm = ts => { const d=new Date(ts); return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0') };
 const dayLabel = ts => { const d=new Date(ts), n=new Date();
   if(d.toDateString()===n.toDateString()) return '今日';
   const y=new Date(n); y.setDate(n.getDate()-1); if(d.toDateString()===y.toDateString()) return '昨日';
-  return `${d.getMonth()+1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})` };
-const listTime = ts => dayLabel(ts)==='今日' ? hhmm(ts) : dayLabel(ts).replace(/\(.\)/,'');
+  return `${d.getMonth()+1}月${d.getDate()}日(${'日月火水木金土'[d.getDay()]})` };
+const listTime = ts => { const l=dayLabel(ts); return l==='今日'?hhmm(ts):l.replace(/\(.\)/,'') };
 const lastMsg = fid => [...(S.msgs[fid]||[])].reverse().find(m=>m.from!=='sys');
 const affPct = f => { const l=levelOf(f.aff), cur=LEVELS[l], nx=LEVELS[l+1]; return nx ? (f.aff-cur.min)/(nx.min-cur.min)*100 : 100 };
 
-// 名刺
-function meishi(c, f, attrs=''){
-  return `<div class="ms" style="${cv(c)}" ${attrs}><div class="ms-in">
-    <div class="ms-row"><span class="ms-name">${esc(c.name)}</span><span class="ms-kana">${esc(c.kana)}</span>${f?`<span class="ms-lv">♥ ${LEVELS[levelOf(f.aff)].name}</span>`:''}</div>
-    <div class="ms-store">${esc(c.store)}　${esc(c.job)}</div>
-    <div class="ms-catch">${esc(c.catch)}</div>
-    <span class="ms-hanko">${esc(c.name[0])}</span></div></div>`;
-}
-
 const I = {
-  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M3 10h18" /></svg>',
-  talk:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 4C7 4 3 7.3 3 11.3c0 2.3 1.3 4.3 3.4 5.7L6 20.5l3.6-2c.8.2 1.6.3 2.4.3 5 0 9-3.3 9-7.5S17 4 12 4z"/></svg>',
-  set:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
-  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
-  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
-  close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
-  more:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
-  send:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 12.5 20 4l-5 16-3.2-6.3z"/></svg>',
-  redo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5M4 4v4.5h4.5"/></svg>',
+  home:['<path d="M4 10.5 12 4l8 6.5V20H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>','<path d="M4 10.5 12 4l8 6.5V20H4z" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'],
+  talk:['<path d="M12 4.5c-4.7 0-8.5 3-8.5 6.8 0 2.2 1.3 4.1 3.3 5.4l-.6 3 3.2-1.8c.8.2 1.7.3 2.6.3 4.7 0 8.5-3 8.5-6.9S16.7 4.5 12 4.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>','<path d="M12 4.5c-4.7 0-8.5 3-8.5 6.8 0 2.2 1.3 4.1 3.3 5.4l-.6 3 3.2-1.8c.8.2 1.7.3 2.6.3 4.7 0 8.5-3 8.5-6.9S16.7 4.5 12 4.5z" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'],
+  set:['<circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M6 18l1.6-1.6M16.4 7.6 18 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>','<circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M6 18l1.6-1.6M16.4 7.6 18 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'],
+};
+const svg = p => `<svg viewBox="0 0 24 24">${p}</svg>`;
+const IC = {
+  addp:svg('<circle cx="10" cy="8.5" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 19.5c.8-3.3 3.4-5.2 6.5-5.2 1.4 0 2.7.4 3.8 1.1M18.5 13v6M15.5 16h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
+  back:svg('<path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'),
+  close:svg('<path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>'),
+  menu:svg('<path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
+  send:svg('<path d="M12 19V6M6.5 11.5 12 6l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'),
+  talk:svg(I.talk[0]),
+  redo:svg('<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9M4.5 4.5V9H9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'),
 };
 
 function refresh(){ renderNav(); renderTab(); if(openChatId) renderMsgs() }
 
 function renderNav(){
   const unread = S.friends.reduce((a,f)=>a+(f.unread||0),0);
-  const items = [['home','名刺入れ'],['talk','トーク'],['set','設定']];
-  $('#nav').innerHTML = items.map(([k,l])=>`<button class="${tab===k?'on':''}" data-tab="${k}" aria-label="${l}">${I[k]}${l}${k==='talk'&&unread?`<span class="nb">${unread>99?'99+':unread}</span>`:''}</button>`).join('');
+  const items = [['home','ホーム'],['talk','トーク'],['set','設定']];
+  $('#nav').innerHTML = items.map(([k,l])=>`<button class="${tab===k?'on':''}" data-tab="${k}">${svg(I[k][tab===k?1:0])}${l}${k==='talk'&&unread?`<span class="nb">${unread>99?'99+':unread}</span>`:''}</button>`).join('');
 }
 
 function renderTab(){
@@ -562,72 +503,72 @@ function renderTab(){
 }
 
 function homeView(){
-  // 最近話した順に、いちばん最近を一番手前（下）に
-  const fr = S.friends.map(f=>({f,c:charById(f.charId),t:(lastMsg(f.id)||{ts:f.addedAt}).ts})).sort((a,b)=>a.t-b.t);
+  const fr = S.friends.map(f=>({f,c:charById(f.charId)}));
   const reco = CHARS.filter(c=>!friend(c.id));
-  return `<div class="hd"><h1>名刺入れ</h1><button class="fab" data-act="add" aria-label="友だち追加">${I.plus}</button></div>
-  <button class="mycard" data-tab="set">${meSeal(48)}<div><div class="nm">${esc(S.me.name)}</div><div class="st">${esc(S.me.status||'ひとことを設定')}</div></div><span class="gd">${GENDERS[S.me.gender]}</span></button>
-  <div class="sec"><h2>もらった名刺</h2><span>${fr.length}枚</span></div>
-  ${fr.length ? `<div class="wallet">${fr.map(({f,c})=>meishi(c,f,`role="button" tabindex="0" data-act="profile" data-id="${f.id}"`)).join('')}</div>`
-   : `<div class="wallet-empty"><span>まだ名刺がありません。<br>気になる相手から受け取ってみよう。</span><button class="pill" data-act="add">名刺を受け取る</button></div>`}
-  ${reco.length?`<div class="sec"><h2>まだ会っていない</h2><span>${reco.length}人</span></div>
-  <div class="reco">${reco.map(c=>`<button class="reco-c" style="${cv(c)}" data-act="add" data-id="${c.id}">${seal(c,58)}<b>${esc(c.name)}</b><small>${esc(c.job)}</small><div class="add">名刺を受け取る</div></button>`).join('')}</div>`:''}`;
+  return `<div class="hd"><h1>ホーム</h1><button class="ib" data-act="add" aria-label="友だち追加">${IC.addp}</button></div>
+  <button class="mine" data-tab="set">${meAv(60)}<div class="tx"><div class="t1">${esc(S.me.name)}</div><div class="t2">${esc(S.me.status||'ステータスメッセージを入力')}</div></div></button>
+  <div class="sec"><b>友だち ${fr.length}</b></div>
+  ${fr.length ? fr.map(({f,c})=>`<button class="row" data-act="profile" data-id="${f.id}">${av(c,46)}<div class="tx"><div class="t1">${esc(c.name)}</div><div class="t2">${esc(c.status)}</div></div></button>`).join('')
+    : `<p class="foot" style="padding:6px 20px 4px">まだ友だちがいません。下から追加できます。</p>`}
+  ${reco.length?`<div class="sec"><b>知り合いかも？</b></div>
+  ${reco.map(c=>`<div class="row">${av(c,46)}<div class="tx"><div class="t1">${esc(c.name)}</div><div class="t2">${esc(c.job)}　${esc(c.store)}</div></div><button class="chip" data-act="add" data-id="${c.id}">追加</button></div>`).join('')}`:''}
+  <div style="height:16px"></div>`;
 }
 
 function talkView(){
   const list = S.friends.map(f=>({f,c:charById(f.charId),m:lastMsg(f.id)})).filter(x=>x.m).sort((a,b)=>b.m.ts-a.m.ts);
-  return `<div class="hd"><h1>トーク</h1><button class="fab" data-act="add" aria-label="友だち追加">${I.plus}</button></div>
-  ${list.length ? `<div class="tlist">${list.map(({f,c,m})=>`<button class="trow" data-act="chat" data-id="${f.id}">${seal(c,50,f.unread)}
-     <div class="tx"><div class="nm">${esc(c.name)}<small>${esc(c.job)}</small></div>
-     <div class="pv ${typing[f.id]?'typ':f.unread?'on':''}">${typing[f.id]?'入力中…':esc((m.from==='me'?'あなた：':'')+m.text.replace(/\n/g,' '))}</div></div>
-     <div class="rt"><span class="tm">${listTime(m.ts)}</span>${f.unread?`<span class="ub">${f.unread}</span>`:''}</div></button>`).join('')}</div>`
-   : `<div class="blank"><b>まだトークはありません</b><p>名刺を受け取ると、<br>向こうから最初のメッセージが届きます。</p><button class="pill" data-act="add">名刺を受け取る</button></div>`}`;
+  return `<div class="hd"><h1>トーク</h1><button class="ib" data-act="add" aria-label="友だち追加">${IC.addp}</button></div>
+  ${list.length ? list.map(({f,c,m})=>`<button class="row trow" data-act="chat" data-id="${f.id}">${av(c,52)}
+     <div class="tx"><div class="top"><span class="t1">${esc(c.name)}</span><span class="tm">${listTime(m.ts)}</span></div>
+     <div class="bot"><span class="t2 ${typing[f.id]?'typ':''}">${typing[f.id]?'入力中…':esc(m.text.replace(/\n/g,' '))}</span>${f.unread?`<span class="ub">${f.unread}</span>`:''}</div></div></button>`).join('')
+   : `<div class="empty"><b>トークはまだありません</b><p>友だちを追加すると、<br>相手からメッセージが届きます。</p><button class="btn" data-act="add">友だちを追加</button></div>`}`;
 }
 
 function setView(){
   const g = Object.entries(GENDERS);
-  return `<div class="hd"><h1>設定</h1></div>
-  <div class="sec"><h2>あなた</h2></div>
+  return `<div class="set"><div class="hd"><h1>設定</h1></div>
+  <div class="sec"><b>プロフィール</b></div>
   <div class="grp">
-    <div class="fld"><label for="s-name">名前（この名前で呼ばれます）</label><input id="s-name" value="${esc(S.me.name)}" maxlength="12"></div>
-    <div class="fld"><label>性別（話し方の参考にします）</label><div class="seg">${g.map(([k,l])=>`<button class="${S.me.gender===k?'on':''}" data-act="gender" data-id="${k}">${l}</button>`).join('')}</div></div>
-    <div class="fld"><label for="s-status">ひとこと</label><input id="s-status" value="${esc(S.me.status)}" maxlength="30" placeholder="名刺入れに表示されます"></div>
+    <div class="cell"><label for="s-name">名前</label><input id="s-name" value="${esc(S.me.name)}" maxlength="12"></div>
+    <div class="cell"><label>性別</label><span class="sp"></span><div class="seg">${g.map(([k,l])=>`<button class="${S.me.gender===k?'on':''}" data-act="gender" data-id="${k}">${l}</button>`).join('')}</div></div>
+    <div class="cell"><label for="s-status">ステータス</label><input id="s-status" value="${esc(S.me.status)}" maxlength="30" placeholder="未設定"></div>
   </div>
-  <div class="sec"><h2>表示</h2></div>
-  <div class="grp"><div class="fld"><div class="seg">
+  <p class="foot">名前と性別は、相手の話し方に反映されます。</p>
+  <div class="sec"><b>表示</b></div>
+  <div class="grp"><div class="cell"><label>テーマ</label><span class="sp"></span><div class="seg">
     <button class="${S.mode==='light'?'on':''}" data-act="mode" data-id="light">ライト</button>
-    <button class="${S.mode==='night'?'on':''}" data-act="mode" data-id="night">ナイト</button></div></div></div>
-  <div class="sec"><h2>会話AI</h2><span>テスト用</span></div>
+    <button class="${S.mode==='night'?'on':''}" data-act="mode" data-id="night">ダーク</button></div></div></div>
+  <div class="sec"><b>会話AI（テスト）</b></div>
   <div class="grp">
-    <div class="fld"><div class="seg">
-      <button class="${S.ai.provider==='mock'?'on':''}" data-act="prov" data-id="mock">固定セリフ</button>
-      <button class="${S.ai.provider==='gemini'?'on':''}" data-act="prov" data-id="gemini">Gemini API</button></div></div>
+    <div class="cell"><label>返信</label><span class="sp"></span><div class="seg">
+      <button class="${S.ai.provider==='mock'?'on':''}" data-act="prov" data-id="mock">固定</button>
+      <button class="${S.ai.provider==='gemini'?'on':''}" data-act="prov" data-id="gemini">Gemini</button></div></div>
     ${S.ai.provider==='gemini'?`
-    <div class="fld"><label for="s-key">APIキー</label><input id="s-key" type="password" value="${esc(S.ai.key)}" placeholder="AIza..."></div>
-    <div class="fld"><label for="s-model">モデル名</label><input id="s-model" value="${esc(S.ai.model)}"></div>`:''}
+    <div class="cell"><label for="s-key">APIキー</label><input id="s-key" type="password" value="${esc(S.ai.key)}" placeholder="未入力"></div>
+    <div class="cell"><label for="s-model">モデル</label><input id="s-model" value="${esc(S.ai.model)}"></div>`:''}
   </div>
-  <p class="note">${S.ai.provider==='gemini'?'APIキーはこの端末のブラウザにだけ保存されます。':'固定セリフは、送った言葉のキーワードに合わせて返事を選びます。'}</p>
-  <div class="sec"><h2>データ</h2></div>
-  <div class="grp"><button class="danger" data-act="reset">名刺とトークをすべて消す</button></div>
-  <p class="note">yoruAI prototype v0.2</p>`;
+  <p class="foot">${S.ai.provider==='gemini'?'APIキーはこの端末のブラウザにだけ保存されます。':'固定は、送った言葉に合わせて用意したセリフから返します。'}</p>
+  <div class="sec"><b>データ</b></div>
+  <div class="grp"><button class="danger" data-act="reset">友だちとトークをすべて削除</button></div>
+  <p class="foot" style="padding-bottom:28px">yoruAI 0.3</p></div>`;
 }
 
-/* --- chat room --- */
+/* --- トークルーム --- */
 function openChat(fid){
   const f = friend(fid); if(!f) return;
   openChatId = fid; f.unread = 0; save(); $('#banner').classList.remove('show');
   const c = charById(f.charId);
-  $('#chat').innerHTML = `<div class="c-hd"><button class="ib" data-act="close-chat" aria-label="戻る">${I.back}</button>
-    <button class="c-who" data-act="profile" data-id="${fid}">${seal(c,38)}<div><div class="nm">${esc(c.name)}</div><div class="lv"><span id="c-lv"></span><i><b id="c-bar"></b></i></div></div></button>
-    <button class="ib" data-act="profile" data-id="${fid}" aria-label="プロフィール">${I.more}</button></div>
+  $('#chat').innerHTML = `<div class="lhd"><button class="ib" data-act="close-chat" aria-label="戻る">${IC.back}</button>
+    <div class="ttl">${esc(c.name)}<small id="c-sub"></small></div>
+    <button class="ib" data-act="profile" data-id="${fid}" aria-label="プロフィール">${IC.menu}</button></div>
     <div id="msgs"></div>
-    <form class="c-in" id="cin"><textarea id="inp" rows="1" placeholder="メッセージ" aria-label="メッセージ"></textarea><button class="send" id="sendb" aria-label="送信">${I.send}</button></form>`;
+    <form class="cin" id="cin"><textarea id="inp" rows="1" placeholder="メッセージを入力" aria-label="メッセージ"></textarea><button class="send" id="sendb" aria-label="送信">${IC.send}</button></form>`;
   $('#chat').classList.add('open'); $('#profile').classList.remove('open');
   renderMsgs(true); refresh();
   const inp = $('#inp');
   inp.oninput = ()=>{ inp.style.height='auto'; inp.style.height=inp.scrollHeight+'px'; $('#sendb').classList.toggle('on', !!inp.value.trim()) };
   inp.onkeydown = e=>{ if(e.key==='Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); $('#cin').requestSubmit() } };
-  $('#cin').onsubmit = e=>{ e.preventDefault(); const v=inp.value.trim(); if(!v) return; inp.value=''; inp.oninput(); sendMsg(fid, v) };
+  $('#cin').onsubmit = e=>{ e.preventDefault(); const v=inp.value.trim(); if(!v) return; inp.value=''; inp.oninput(); sendMsg(fid, v); inp.focus() };
 }
 function closeChat(){ openChatId=null; $('#chat').classList.remove('open'); refresh() }
 
@@ -639,85 +580,77 @@ function renderMsgs(force){
   for(const m of S.msgs[fid]||[]){
     const d = dayLabel(m.ts);
     if(d!==lastDay){ html+=`<div class="dsep"><span>${d}</span></div>`; lastDay=d; prev=null }
-    if(m.from==='sys'){ html+=`<div class="sys"><span>${esc(m.text)}</span></div>`; prev=null; continue }
+    if(m.from==='sys'){ html+=`<div class="sys ${m.text.includes('親密度')?'up':''}">${esc(m.text.replace(/^\S+\s/,''))}</div>`; prev=null; continue }
     const first = prev!==m.from;
-    if(m.from==='me') html+=`<div class="m me ${first?'first':''}"><div class="meta">${m.read?'<span class="rd">既読</span>':''}<span>${hhmm(m.ts)}</span></div><div class="b">${esc(m.text)}</div></div>`;
-    else html+=`<div class="m ai ${first?'first':''}"><div class="aw">${first?seal(c,34):''}</div><div class="col"><div class="bw"><div class="b">${esc(m.text)}</div><div class="meta">${hhmm(m.ts)}</div></div></div></div>`;
+    if(m.from==='me') html+=`<div class="m me ${first?'first':''}"><div class="meta">${m.read?'<span>既読</span>':''}<span>${hhmm(m.ts)}</span></div><div class="b">${esc(m.text)}</div></div>`;
+    else html+=`<div class="m ai ${first?'first':''}"><div class="aw">${first?av(c,36):''}</div><div class="col">${first?`<div class="nm">${esc(c.name)}</div>`:''}<div class="bw"><div class="b">${esc(m.text)}</div><div class="meta">${hhmm(m.ts)}</div></div></div></div>`;
     prev = m.from;
   }
-  if(typing[fid]){ const first = prev!=='ai'; html+=`<div class="m ai typing ${first?'first':''}"><div class="aw">${first?seal(c,34):''}</div><div class="col"><div class="b"><i></i><i></i><i></i></div></div></div>` }
+  if(typing[fid]){ const first = prev!=='ai'; html+=`<div class="m ai typing ${first?'first':''}"><div class="aw">${first?av(c,36):''}</div><div class="col"><div class="b"><i></i><i></i><i></i></div></div></div>` }
   box.innerHTML = html;
-  $('#c-lv').textContent = '♥ '+LEVELS[levelOf(f.aff)].name;
-  $('#c-bar').style.width = affPct(f)+'%';
+  $('#c-sub').textContent = typing[fid] ? '入力中…' : `親密度　${LEVELS[levelOf(f.aff)].name}`;
   if(near) box.scrollTop = box.scrollHeight;
 }
 
-/* --- profile --- */
+/* --- プロフィール --- */
 function openProfile(fid){
   const f = friend(fid), c = charById(f.charId), lv = levelOf(f.aff), nx = LEVELS[lv+1];
-  $('#profile').innerHTML = `<div class="pf-top" style="${cv(c)}"><button class="ib" data-act="close-profile" aria-label="閉じる">${I.close}</button>
-      <div class="pf-card">${meishi(c,f)}</div></div>
-    <div class="pf-body">
-      <p class="pf-st">「${esc(c.status)}」</p>
-      <div class="tags">${c.tags.map(t=>`<span>${esc(t)}</span>`).join('')}</div>
-      <div class="aff"><div class="aff-t"><b>♥ ${LEVELS[lv].name}</b><span>${nx?`「${nx.name}」まであと ${nx.min-f.aff}`:'これ以上はない'}</span></div>
-        <div class="aff-bar"><i style="width:${affPct(f)}%"></i></div>
-        <div class="aff-steps">${LEVELS.map((x,i)=>`<span class="${i<=lv?'on':''}">${x.name}</span>`).join('')}</div>
-        <div class="aff-meet">${MEETS[f.meet].icon} ${MEETS[f.meet].label}で出会った</div></div>
-      <div class="pf-acts"><button class="pri" data-act="chat" data-id="${fid}">${I.talk}トーク</button>
-        <button class="sec2" data-act="remeet" data-id="${c.id}">${I.redo}出会い直す</button></div>
+  const p = $('#profile'); p.setAttribute('style', tv(c));
+  p.innerHTML = `<div class="lhd"><button class="ib" data-act="close-profile" aria-label="閉じる">${IC.close}</button><div class="ttl"></div><div style="width:44px"></div></div>
+    <div class="pf">${av(c,96)}<h2>${esc(c.name)}</h2><div class="job">${esc(c.job)}　${esc(c.store)}</div><p class="st">${esc(c.status)}</p></div>
+    <div class="pf-panel">
+      <div class="aff"><span class="lv">${LEVELS[lv].name}</span><span class="bar"><i style="width:${affPct(f)}%"></i></span><span class="nx">${nx?`${nx.name}まで ${nx.min-f.aff}`:'最大'}</span></div>
+      <div class="pf-meta"><span>出会い方</span><span>${MEETS[f.meet].label}</span></div>
+      <div class="acts"><button data-act="chat" data-id="${fid}">${IC.talk}トーク</button><button data-act="remeet" data-id="${c.id}">${IC.redo}出会い直す</button></div>
     </div>`;
-  $('#profile').classList.add('open');
+  p.classList.add('open');
 }
 
-/* --- add friend --- */
+/* --- 友だち追加 --- */
 let addSel = {idx:0, meet:'first'};
 function openAdd(charId){
   addSel.idx = Math.max(0, CHARS.findIndex(c=>c.id===charId));
-  if(charId && friend(charId)) addSel.meet = friend(charId).meet;
-  $('#add').innerHTML = `<div class="a-hd"><button class="ib" data-act="close-add" aria-label="閉じる">${I.close}</button><h1>名刺を受け取る</h1><div style="width:40px"></div></div>
-    <div class="a-body">
-      <div class="cards" id="cards">${CHARS.map(c=>meishi(c,null)).join('')}</div>
-      <div id="got"></div>
-      <div class="a-info" id="ainfo"></div>
+  addSel.meet = (charId && friend(charId)) ? friend(charId).meet : 'first';
+  $('#add').innerHTML = `<div class="lhd"><button class="ib" data-act="close-add" aria-label="閉じる">${IC.close}</button><div class="ttl">友だち追加</div><div style="width:44px"></div></div>
+    <div class="body">
+      <div class="cards" id="cards">${CHARS.map(c=>`<div class="card" style="${tv(c)}">
+        <div class="cv">${av(c,84)}${friend(c.id)?'<span class="got">追加済み</span>':''}</div>
+        <div class="ci"><h3>${esc(c.name)}</h3><div class="job">${esc(c.job)}　${esc(c.store)}</div>
+        <p class="cp">${esc(c.catch)}</p><p class="tg">${c.tags.map(t=>'#'+esc(t)).join('　')}</p></div></div>`).join('')}</div>
       <div class="dots" id="dots">${CHARS.map(()=>'<i></i>').join('')}</div>
-      <p class="a-q">どこで出会った？</p>
-      <div class="meets" id="meets"></div>
-      <p class="meet-d" id="meetd"></p>
+      <div class="meet-sec"><h4>出会い方</h4><div class="seg full" id="meets"></div><p class="meet-d" id="meetd"></p></div>
     </div>
-    <div class="a-foot"><button class="big" data-act="do-add" id="addbtn"></button></div>`;
+    <div class="add-ft"><button class="btn wide" data-act="do-add" id="addbtn"></button></div>`;
   $('#add').classList.add('open');
   const cards = $('#cards');
-  requestAnimationFrame(()=>{ cards.scrollLeft = cards.children[addSel.idx].offsetLeft - 44; updAdd() });
-  cards.onscroll = ()=>{ const w = cards.children[0].offsetWidth+14; const i = Math.min(CHARS.length-1, Math.max(0, Math.round(cards.scrollLeft/w))); if(i!==addSel.idx){ addSel.idx=i; updAdd() } };
+  requestAnimationFrame(()=>{ cards.scrollLeft = cards.children[addSel.idx].offsetLeft - 32; updAdd() });
+  cards.onscroll = ()=>{ const w = cards.children[0].offsetWidth+12; const i = Math.min(CHARS.length-1, Math.max(0, Math.round(cards.scrollLeft/w))); if(i!==addSel.idx){ addSel.idx=i; updAdd() } };
 }
 function updAdd(){
   const c = CHARS[addSel.idx], had = friend(c.id);
-  $('#add').style.setProperty('--glow', c.colors[0]+'66');
-  [...$('#cards').children].forEach((d,i)=>{ d.classList.toggle('on', i===addSel.idx); d.classList.toggle('off', i!==addSel.idx) });
+  [...$('#cards').children].forEach((d,i)=>d.classList.toggle('off', i!==addSel.idx));
   [...$('#dots').children].forEach((d,i)=>d.classList.toggle('on', i===addSel.idx));
-  $('#ainfo').innerHTML = `<div class="tags">${c.tags.map(t=>`<span>${esc(t)}</span>`).join('')}${had?'<span style="background:#fff;color:var(--beni)">受け取り済み</span>':''}</div>`;
-  $('#meets').innerHTML = Object.entries(MEETS).map(([k,m])=>`<button class="meet ${addSel.meet===k?'on':''}" data-act="meet" data-id="${k}"><span class="mi">${m.icon}</span><b>${m.label}</b></button>`).join('');
-  $('#meetd').textContent = MEETS[addSel.meet].desc;
-  const b = $('#addbtn'); delete b.dataset.armed; b.classList.remove('warn');
-  b.textContent = had ? `${c.name}と出会い直す` : `${c.name}の名刺を受け取る`;
+  $('#meets').innerHTML = Object.entries(MEETS).map(([k,m])=>`<button class="${addSel.meet===k?'on':''}" data-act="meet" data-id="${k}">${m.label==='マッチングアプリ'?'マッチング':m.label}</button>`).join('');
+  $('#meetd').textContent = MEETS[addSel.meet].desc + 'という設定で、最初のメッセージが届きます。';
+  const b = $('#addbtn'); delete b.dataset.armed;
+  b.textContent = had ? '出会い直す' : '追加';
 }
 function closeAdd(){ $('#add').classList.remove('open') }
 
-/* --- banner / toast --- */
+/* --- 通知・トースト --- */
 let bTimer;
 function banner(f, text){
   const c = charById(f.charId), b = $('#banner');
-  b.innerHTML = `${seal(c,40)}<div class="tx"><div><b>${esc(c.name)}</b><small>いま</small></div><p>${esc(text.replace(/\n/g,' '))}</p></div>`;
+  b.innerHTML = `${av(c,40)}<div class="tx"><div class="l1"><span>${esc(c.name)}</span><small>今</small></div><p>${esc(text.replace(/\n/g,' '))}</p></div>`;
   b.dataset.id = f.id; b.classList.add('show');
   clearTimeout(bTimer); bTimer = setTimeout(()=>b.classList.remove('show'), 3800);
 }
 let tTimer;
-function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(tTimer); tTimer=setTimeout(()=>el.classList.remove('show'),2200) }
+function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(tTimer); tTimer=setTimeout(()=>el.classList.remove('show'),2000) }
 
 function applyMode(){
   $('#app').dataset.mode = S.mode;
-  document.querySelector('meta[name=theme-color]').content = S.mode==='night'?'#17080F':'#FFF4F6';
+  document.querySelector('meta[name=theme-color]').content = S.mode==='night'?'#141416':'#FFFFFF';
 }
 
 /* ---------- EVENTS ---------- */
@@ -732,10 +665,10 @@ document.addEventListener('click', e=>{
     case 'meet': addSel.meet=id; updAdd(); break;
     case 'do-add': {
       const c = CHARS[addSel.idx], again = !!friend(c.id);
-      if(again && !t.dataset.armed){ t.dataset.armed=1; t.classList.add('warn'); t.textContent='トーク履歴が消えます。もう一度押して確定'; return }
+      if(again && !t.dataset.armed){ t.dataset.armed=1; t.textContent='トーク履歴が消えます。もう一度押して確定'; return }
       addFriend(c.id, addSel.meet); closeAdd(); $('#profile').classList.remove('open');
       if(openChatId===c.id) closeChat();
-      tab='talk'; refresh(); toast(again?`${c.name}と出会い直しました`:`${c.name}の名刺を受け取りました`); break; }
+      tab='talk'; refresh(); toast(again?`${c.name}と出会い直しました`:`${c.name}を追加しました`); break; }
     case 'profile': openProfile(id); break;
     case 'close-profile': $('#profile').classList.remove('open'); break;
     case 'chat': $('#profile').classList.remove('open'); openChat(id); break;
@@ -745,12 +678,11 @@ document.addEventListener('click', e=>{
     case 'mode': S.mode=id; save(); applyMode(); refresh(); break;
     case 'prov': S.ai.provider=id; save(); refresh(); break;
     case 'reset':
-      if(t.dataset.armed){ localStorage.removeItem(KEY); S=structuredClone(DEFAULT); applyMode(); tab='home'; refresh(); toast('すべて消しました') }
-      else { t.dataset.armed=1; t.textContent='もう一度押すと消します（元に戻せません）' }
+      if(t.dataset.armed){ localStorage.removeItem(KEY); S=structuredClone(DEFAULT); applyMode(); tab='home'; refresh(); toast('削除しました') }
+      else { t.dataset.armed=1; t.textContent='もう一度押すと削除します（元に戻せません）' }
       break;
   }
 });
-document.addEventListener('keydown', e=>{ if((e.key==='Enter'||e.key===' ') && e.target.matches('.ms[role=button]')){ e.preventDefault(); e.target.click() } });
 document.addEventListener('input', e=>{
   const id = e.target.id;
   if(id==='s-name'){ S.me.name = e.target.value.trim()||'あなた'; save() }
