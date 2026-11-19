@@ -1,7 +1,7 @@
 // Run: node tests/engine.test.cjs
 'use strict';
 const assert=require('node:assert/strict');
-const E=require('../api/engine');
+const E=require('../lib/engine');
 let count=0;
 function test(title,fn){fn();count++;console.log('✓ '+title)}
 test('five independent features',()=>{
